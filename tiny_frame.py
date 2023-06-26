@@ -1,0 +1,40 @@
+import tf.TinyFrame as TF
+from enum import Enum
+import proto_msg as pm
+
+
+class TfMsgType(Enum):
+    TYPE_DEFAULT = 0x00
+    TYPE_UART = 0x01
+    TYPE_I2C = 0x02
+    TYPE_SPI265 = 0x03
+
+
+def tf_init(write_callback):
+    tf = TF.TinyFrame()
+    tf.SOF_BYTE = 0x01
+    tf.ID_BYTES = 1
+    tf.LEN_BYTES = 1
+    tf.TYPE_BYTES = 1
+    tf.CKSUM_TYPE = 'xor'
+    tf.write = write_callback
+
+    # Add frame type listeners
+    tf.add_fallback_listener(fallback_listener)
+    tf.add_type_listener(TfMsgType.TYPE_UART.value, uart_listener)
+
+    return tf
+
+
+def fallback_listener(tf, msg):
+    print("Fallback listener")
+    print(msg.data)
+
+
+def uart_listener(tf, msg):
+    pm.decode_uart_msg(bytes(msg.data))
+
+    # global RX_BUFFER
+    # RX_BUFFER += msg.data
+    # print("Uart listener")
+    # print(msg.data)

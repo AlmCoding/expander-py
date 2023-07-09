@@ -10,13 +10,18 @@ import string
 import random
 import serial
 import tiny_frame
-import proto_msg as pm
+import proto_uart_msg as pm
 
-TX_LOOPS = 100000
+TX_LOOPS = 10000
 MIN_TX_SIZE = 1
 MAX_DATA_SIZE = 64
 TX_HISTORY = bytearray()
 TX_COUNTER = 0
+
+
+def uart_config(tf):
+    msg = pm.encode_uart_config_msg(pm.UartId.UART1, 9600)
+    tf.send(tiny_frame.TfMsgType.TYPE_UART.value, msg, 0)
 
 
 def uart_send(tf):
@@ -42,10 +47,14 @@ def uart_send(tf):
 
 def main(arguments):
     global TX_HISTORY
-    print("TinyFrame test sender")
+    print("Uart test sender")
 
     with serial.Serial('COM4', 115200, timeout=1) as ser:
         tf = tiny_frame.tf_init(ser.write)
+
+        # Configure uart
+        #uart_config(tf)
+        time.sleep(1)
 
         while True:
             uart_send(tf)

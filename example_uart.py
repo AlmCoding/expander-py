@@ -12,7 +12,7 @@ import serial
 import tiny_frame
 import proto_uart_msg as pm
 
-TX_LOOPS = 10000
+TX_LOOPS = 1000
 MIN_TX_SIZE = 1
 MAX_DATA_SIZE = 64
 TX_HISTORY = bytearray()
@@ -20,7 +20,7 @@ TX_COUNTER = 0
 
 
 def uart_config(tf):
-    msg = pm.encode_uart_config_msg(pm.UartId.UART1, 9600)
+    msg = pm.encode_uart_config_msg(pm.UartId.UART0, 9600)
     tf.send(tiny_frame.TfMsgType.TYPE_UART.value, msg, 0)
 
 
@@ -36,7 +36,7 @@ def uart_send(tf):
     if pm.TX_SPACE >= len(tx_data) and TX_COUNTER < TX_LOOPS:
         print("Data: '{}'".format(tx_data))
         tx_data = bytes(tx_data, 'ascii')
-        msg = pm.encode_uart_data_msg(pm.UartId.UART1, tx_data)
+        msg = pm.encode_uart_data_msg(pm.UartId.UART0, tx_data)
         print("Send msg (id={}, len={}, tx={}, seq={}) : {}".format(TX_COUNTER, len(msg), len(tx_data), pm.SEQ_NUM, msg))
 
         tf.send(tiny_frame.TfMsgType.TYPE_UART.value, msg, 0)
@@ -53,7 +53,7 @@ def main(arguments):
         tf = tiny_frame.tf_init(ser.write)
 
         # Configure uart
-        #uart_config(tf)
+        # uart_config(tf)
         time.sleep(1)
 
         while True:

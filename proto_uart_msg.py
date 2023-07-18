@@ -8,8 +8,8 @@ SEQ_NUM = 0
 
 
 class UartId(Enum):
-    UART1 = 0
-    UART2 = 1
+    UART0 = 0
+    UART1 = 1
 
 
 def encode_uart_config_msg(uart_id: UartId, baud_rate: int) -> bytes:
@@ -17,10 +17,10 @@ def encode_uart_config_msg(uart_id: UartId, baud_rate: int) -> bytes:
     SEQ_NUM += 1
     msg = uart_pb2.UartMsg()
 
-    if uart_id == UartId.UART1:
-        msg.cfg_msg.id = uart_pb2.UartId.UART1
+    if uart_id == UartId.UART0:
+        msg.cfg_msg.id = uart_pb2.UartId.UART0
     else:
-        msg.cfg_msg.id = uart_pb2.UartId.UART2
+        msg.cfg_msg.id = uart_pb2.UartId.UART1
 
     msg.cfg_msg.baudrate = baud_rate
     msg.sequence_number = SEQ_NUM
@@ -32,10 +32,10 @@ def encode_uart_data_msg(uart_id: UartId, data: bytes) -> bytes:
     SEQ_NUM += 1
     msg = uart_pb2.UartMsg()
 
-    if uart_id == UartId.UART1:
-        msg.data_msg.id = uart_pb2.UartId.UART1
+    if uart_id == UartId.UART0:
+        msg.data_msg.id = uart_pb2.UartId.UART0
     else:
-        msg.data_msg.id = uart_pb2.UartId.UART2
+        msg.data_msg.id = uart_pb2.UartId.UART1
 
     msg.data_msg.data = data
     msg.sequence_number = SEQ_NUM

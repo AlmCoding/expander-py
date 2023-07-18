@@ -7,10 +7,15 @@ SYNCHRONIZED = True
 
 
 class GpioId(Enum):
-    GPIO1 = 0
-    GPIO2 = 1
-    GPIO3 = 2
-    GPIO4 = 3
+    GPIO0 = 0
+    GPIO1 = 1
+    GPIO2 = 2
+    GPIO3 = 3
+    GPIO4 = 4
+    GPIO5 = 5
+    GPIO6 = 6
+    GPIO7 = 7
+    GPIO_CNT = 8
 
 
 class GpioMode(Enum):
@@ -47,10 +52,14 @@ def encode_gpio_config_msg(config: list) -> bytes:
     for cfg in config:
         GpioConfigs[cfg.gpio_id] = cfg.gpio_mode
 
+    msg.cfg_msg.gpio0 = GpioConfigs[GpioId.GPIO0].value
     msg.cfg_msg.gpio1 = GpioConfigs[GpioId.GPIO1].value
     msg.cfg_msg.gpio2 = GpioConfigs[GpioId.GPIO2].value
     msg.cfg_msg.gpio3 = GpioConfigs[GpioId.GPIO3].value
     msg.cfg_msg.gpio4 = GpioConfigs[GpioId.GPIO4].value
+    msg.cfg_msg.gpio5 = GpioConfigs[GpioId.GPIO5].value
+    msg.cfg_msg.gpio6 = GpioConfigs[GpioId.GPIO6].value
+    msg.cfg_msg.gpio7 = GpioConfigs[GpioId.GPIO7].value
 
     msg.sequence_number = SEQ_NUM
     return msg.SerializeToString()
@@ -66,11 +75,14 @@ def encode_gpio_data_msg(data: list) -> bytes:
     for dt in data:
         GpioData[dt.gpio_id] = dt.output_data
 
+    msg.data_msg.gpio0 = GpioData[GpioId.GPIO0]
     msg.data_msg.gpio1 = GpioData[GpioId.GPIO1]
     msg.data_msg.gpio2 = GpioData[GpioId.GPIO2]
     msg.data_msg.gpio3 = GpioData[GpioId.GPIO3]
     msg.data_msg.gpio4 = GpioData[GpioId.GPIO4]
-
+    msg.data_msg.gpio5 = GpioData[GpioId.GPIO5]
+    msg.data_msg.gpio6 = GpioData[GpioId.GPIO6]
+    msg.data_msg.gpio7 = GpioData[GpioId.GPIO7]
     msg.sequence_number = SEQ_NUM
     return msg.SerializeToString()
 
@@ -86,16 +98,24 @@ def decode_gpio_msg(data: bytes):
     if inner_msg == "data_msg":
         if msg.sequence_number >= SEQ_NUM:
             SYNCHRONIZED = True
-            print("gpio1:", msg.data_msg.gpio1)
-            print("gpio2:", msg.data_msg.gpio1)
-            print("gpio3:", msg.data_msg.gpio1)
-            print("gpio4:", msg.data_msg.gpio1)
+            print("rx gpio0:", msg.data_msg.gpio0)
+            print("rx gpio1:", msg.data_msg.gpio1)
+            print("rx gpio2:", msg.data_msg.gpio2)
+            print("rx gpio3:", msg.data_msg.gpio3)
+            print("rx gpio4:", msg.data_msg.gpio4)
+            print("rx gpio5:", msg.data_msg.gpio5)
+            print("rx gpio6:", msg.data_msg.gpio6)
+            print("rx gpio7:", msg.data_msg.gpio7)
 
             INPUT_DATA = {
+                GpioId.GPIO0: msg.data_msg.gpio0,
                 GpioId.GPIO1: msg.data_msg.gpio1,
                 GpioId.GPIO2: msg.data_msg.gpio2,
                 GpioId.GPIO3: msg.data_msg.gpio3,
                 GpioId.GPIO4: msg.data_msg.gpio4,
+                GpioId.GPIO5: msg.data_msg.gpio5,
+                GpioId.GPIO6: msg.data_msg.gpio6,
+                GpioId.GPIO7: msg.data_msg.gpio7,
             }
         else:
             print("Rejected data msg! ==========================#")

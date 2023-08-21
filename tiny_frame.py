@@ -1,7 +1,5 @@
 import tf.TinyFrame as TF
 from enum import Enum
-import proto_uart_msg as pm_uart
-import proto_gpio_msg as pm_gpio
 
 
 class TfMsgType(Enum):
@@ -15,30 +13,33 @@ class TfMsgType(Enum):
     TYPE_ADC = 0x07
 
 
-def tf_init(write_callback):
-    tf = TF.TinyFrame()
+TF_INSTANCE = TF.TinyFrame()
+
+
+def tf_init(write_callback) -> TF.TinyFrame:
+    global TF_INSTANCE
+    tf = TF_INSTANCE
+
     tf.SOF_BYTE = 0x01
     tf.ID_BYTES = 1
     tf.LEN_BYTES = 1
     tf.TYPE_BYTES = 1
     tf.CKSUM_TYPE = 'xor'
     tf.write = write_callback
+    tf.add_fallback_listener(tf_fallback_cb)
 
-    # Add frame type listeners
-    tf.add_fallback_listener(fallback_listener)
-    tf.add_type_listener(TfMsgType.TYPE_UART.value, uart_listener)
-    tf.add_type_listener(TfMsgType.TYPE_GPIO.value, gpio_listener)
     return tf
 
 
-def fallback_listener(tf, msg):
-    print("Fallback listener")
-    print(msg.data)
+def tf_register_callback(msg_type: TfMsgType, callback) -> None:
+    global TF_INSTANCE
+    TF_INSTANCE.add_type_listener(msg_type.value, callback)
 
 
-def uart_listener(tf, msg):
-    pm_uart.decode_uart_msg(bytes(msg.data))
+def tf_send(msg_type: TfMsgType, msg) -> None:
+    global TF_INSTANCE
+    TF_INSTANCE.send(msg_type.value, msg)
 
 
-def gpio_listener(tf, msg):
-    pm_gpio.decode_gpio_msg(bytes(msg.data))
+def tf_fallback_cb(tf, msg):
+    raise Exception("No TF type listener fond for this msg:\n" + str(msg.data))

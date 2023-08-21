@@ -12,16 +12,16 @@ import serial
 import tiny_frame
 import proto_gpio_msg as pm
 
-SET_LOOPS = 16 * 1000
+SET_LOOPS = 16 * 100
 SET_COUNTER = 0
 OUTPUT_PATTERN = 1
 REVERSED = False
 
 
-def gpio_config(tf):
+def gpio_config():
     global REVERSED
     if REVERSED:
-        msg = pm.encode_gpio_config_msg([
+        pm.GpioInterface.send_config_msg([
             pm.GpioConfig(pm.GpioId.GPIO0, pm.GpioMode.OUTPUT_PUSHPULL),
             pm.GpioConfig(pm.GpioId.GPIO1, pm.GpioMode.OUTPUT_PUSHPULL),
             pm.GpioConfig(pm.GpioId.GPIO2, pm.GpioMode.OUTPUT_PUSHPULL),
@@ -32,7 +32,7 @@ def gpio_config(tf):
             pm.GpioConfig(pm.GpioId.GPIO7, pm.GpioMode.INPUT_PULLDOWN),
         ])
     else:
-        msg = pm.encode_gpio_config_msg([
+        pm.GpioInterface.send_config_msg([
             pm.GpioConfig(pm.GpioId.GPIO0, pm.GpioMode.INPUT_PULLDOWN),
             pm.GpioConfig(pm.GpioId.GPIO1, pm.GpioMode.INPUT_PULLDOWN),
             pm.GpioConfig(pm.GpioId.GPIO2, pm.GpioMode.INPUT_PULLDOWN),
@@ -43,7 +43,6 @@ def gpio_config(tf):
             pm.GpioConfig(pm.GpioId.GPIO7, pm.GpioMode.OUTPUT_PUSHPULL),
         ])
 
-    tf.send(tiny_frame.TfMsgType.TYPE_GPIO.value, msg, 0)
     print("Send gpio config request")
 
 
@@ -69,39 +68,38 @@ def get_pattern():
 get_pattern.pattern_counter = 0
 
 
-def pattern_matches():
-    if pm.INPUT_DATA[pm.GpioId.GPIO0] == pm.INPUT_DATA[pm.GpioId.GPIO4] and \
-       pm.INPUT_DATA[pm.GpioId.GPIO1] == pm.INPUT_DATA[pm.GpioId.GPIO5] and \
-       pm.INPUT_DATA[pm.GpioId.GPIO2] == pm.INPUT_DATA[pm.GpioId.GPIO6] and \
-       pm.INPUT_DATA[pm.GpioId.GPIO3] == pm.INPUT_DATA[pm.GpioId.GPIO7]:
-        return True
-    else:
-        return False
-
-
-def gpio_generate(tf):
+def gpio_generate():
     global SET_LOOPS, SET_COUNTER, REVERSED
 
     if SET_COUNTER < SET_LOOPS / 2:
         pattern = get_pattern()
         data = []
 
-        for gpio_id, mode in pm.GpioConfigs.items():
+        for gpio_id, mode in pm.GpioInterface.Config.items():
             if mode == pm.GpioMode.OUTPUT_PUSHPULL or \
                mode == pm.GpioMode.OUTPUT_OPENDRAIN:
                 data.append(pm.OutputData(gpio_id, pattern[0]))
                 pattern = pattern[1:]
 
-        msg = pm.encode_gpio_data_msg(data)
-        tf.send(tiny_frame.TfMsgType.TYPE_GPIO.value, msg, 0)
+        pm.GpioInterface.send_data_msg(data)
         SET_COUNTER += 1
     else:
         if not REVERSED:
             REVERSED = True
             SET_COUNTER = 0
-            gpio_config(tf)
+            gpio_config()
         else:
             exit(0)
+
+
+def pattern_matches():
+    if pm.GpioInterface.InputData[pm.GpioId.GPIO0] == pm.GpioInterface.InputData[pm.GpioId.GPIO4] and \
+       pm.GpioInterface.InputData[pm.GpioId.GPIO1] == pm.GpioInterface.InputData[pm.GpioId.GPIO5] and \
+       pm.GpioInterface.InputData[pm.GpioId.GPIO2] == pm.GpioInterface.InputData[pm.GpioId.GPIO6] and \
+       pm.GpioInterface.InputData[pm.GpioId.GPIO3] == pm.GpioInterface.InputData[pm.GpioId.GPIO7]:
+        return True
+    else:
+        return False
 
 
 def main(arguments):
@@ -113,9 +111,9 @@ def main(arguments):
 
         # Configure gpio
         REVERSED = False
-        gpio_config(tf)
+        gpio_config()
         time.sleep(1)
-        gpio_generate(tf)
+        gpio_generate()
 
         while True:
             if ser.in_waiting > 0:
@@ -124,8 +122,8 @@ def main(arguments):
                 # print(data)
                 tf.accept(rx_data)
 
-            if pm.SYNCHRONIZED and pattern_matches():
-                gpio_generate(tf)
+            if pm.GpioInterface.Synchronized and pattern_matches():
+                gpio_generate()
 
 
 if __name__ == '__main__':

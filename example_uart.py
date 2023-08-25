@@ -39,10 +39,9 @@ def main(arguments):
     global TX_HISTORY
     print("Uart test sender")
 
-    uart_int = pm.UartInterface(uart_id=pm.UartId.UART0, baud_rate=115200)
-
     with serial.Serial('COM4', 115200, timeout=1) as ser:
         tf = tiny_frame.tf_init(ser.write)
+        uart_int = pm.UartInterface(uart_id=pm.UartId.UART0, baud_rate=115200)
 
         # Configure uart
         uart_int.send_config_msg()

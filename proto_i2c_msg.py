@@ -53,10 +53,10 @@ class I2cInterface:
                 self.master_buffer_space >= (write_size + read_size))
 
     def get_pending_master_request_ids(self) -> list:
-        return [request.request_id for request in self.master_requests if request.pending]
+        return [request.request_id for rid, request in self.master_requests if request.pending]
 
     def get_completed_master_request_ids(self) -> list:
-        return [request.request_id for request in self.master_requests if not request.pending]
+        return [request.request_id for rid, request in self.master_requests if not request.pending]
 
     def get_master_request(self, request_id: int, remove_completed=True) -> I2cMasterRequest:
         if request_id not in self.master_requests.keys():

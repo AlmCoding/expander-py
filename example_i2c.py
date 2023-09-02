@@ -20,7 +20,7 @@ REQUEST_COUNTER = 0
 REQUEST_IDS = []
 
 MASTER_WRITE_REQUESTS = [{"write": ''.join(random.choice(string.ascii_letters + string.digits)
-                                     for _ in range(random.randint(4, 6))),
+                          for _ in range(random.randint(4, 6))),
                           "read": 0} for i in range(10)]
 
 
@@ -35,7 +35,7 @@ def i2c_send(i2c_int):
         print("Data: '{}'".format(write_data))
         tx_data = bytes(write_data, 'ascii')
 
-        request = pm.I2cMasterRequest(slave_addr=0x05, write_data=tx_data, read_size=read_size)
+        request = pm.I2cMasterWriteRequest(slave_addr=0x05, write_data=tx_data)
         REQUEST_IDS.append(i2c_int.send_master_request_msg(request=request))
 
         REQUEST_COUNTER += 1

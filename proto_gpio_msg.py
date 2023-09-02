@@ -53,14 +53,14 @@ class GpioInterface:
 
         msg = gpio_pb2.GpioMsg()
         msg.sequence_number = GpioInterface.SequenceNumber
-        msg.cfg_msg.gpio0 = GpioInterface.Config[GpioId.GPIO0].value
-        msg.cfg_msg.gpio1 = GpioInterface.Config[GpioId.GPIO1].value
-        msg.cfg_msg.gpio2 = GpioInterface.Config[GpioId.GPIO2].value
-        msg.cfg_msg.gpio3 = GpioInterface.Config[GpioId.GPIO3].value
-        msg.cfg_msg.gpio4 = GpioInterface.Config[GpioId.GPIO4].value
-        msg.cfg_msg.gpio5 = GpioInterface.Config[GpioId.GPIO5].value
-        msg.cfg_msg.gpio6 = GpioInterface.Config[GpioId.GPIO6].value
-        msg.cfg_msg.gpio7 = GpioInterface.Config[GpioId.GPIO7].value
+        msg.cfg.gpio0 = GpioInterface.Config[GpioId.GPIO0].value
+        msg.cfg.gpio1 = GpioInterface.Config[GpioId.GPIO1].value
+        msg.cfg.gpio2 = GpioInterface.Config[GpioId.GPIO2].value
+        msg.cfg.gpio3 = GpioInterface.Config[GpioId.GPIO3].value
+        msg.cfg.gpio4 = GpioInterface.Config[GpioId.GPIO4].value
+        msg.cfg.gpio5 = GpioInterface.Config[GpioId.GPIO5].value
+        msg.cfg.gpio6 = GpioInterface.Config[GpioId.GPIO6].value
+        msg.cfg.gpio7 = GpioInterface.Config[GpioId.GPIO7].value
 
         msg_bytes = msg.SerializeToString()
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_GPIO.value, msg_bytes, 0)
@@ -76,46 +76,46 @@ class GpioInterface:
 
         msg = gpio_pb2.GpioMsg()
         msg.sequence_number = GpioInterface.SequenceNumber
-        msg.data_msg.gpio0 = GpioInterface.Data[GpioId.GPIO0]
-        msg.data_msg.gpio1 = GpioInterface.Data[GpioId.GPIO1]
-        msg.data_msg.gpio2 = GpioInterface.Data[GpioId.GPIO2]
-        msg.data_msg.gpio3 = GpioInterface.Data[GpioId.GPIO3]
-        msg.data_msg.gpio4 = GpioInterface.Data[GpioId.GPIO4]
-        msg.data_msg.gpio5 = GpioInterface.Data[GpioId.GPIO5]
-        msg.data_msg.gpio6 = GpioInterface.Data[GpioId.GPIO6]
-        msg.data_msg.gpio7 = GpioInterface.Data[GpioId.GPIO7]
+        msg.data.gpio0 = GpioInterface.Data[GpioId.GPIO0]
+        msg.data.gpio1 = GpioInterface.Data[GpioId.GPIO1]
+        msg.data.gpio2 = GpioInterface.Data[GpioId.GPIO2]
+        msg.data.gpio3 = GpioInterface.Data[GpioId.GPIO3]
+        msg.data.gpio4 = GpioInterface.Data[GpioId.GPIO4]
+        msg.data.gpio5 = GpioInterface.Data[GpioId.GPIO5]
+        msg.data.gpio6 = GpioInterface.Data[GpioId.GPIO6]
+        msg.data.gpio7 = GpioInterface.Data[GpioId.GPIO7]
 
         msg_bytes = msg.SerializeToString()
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_GPIO.value, msg_bytes, 0)
 
     @staticmethod
     def receive_msg_cb(msg: gpio_pb2.GpioMsg):
+        if msg.sequence_number < GpioInterface.SequenceNumber:
+            print("Rejected GPIO msg! ==========================#")
+            return
+
         inner_msg = msg.WhichOneof("msg")
+        if inner_msg == "data":
+            GpioInterface.Synchronized = True
+            print("rx gpio0:", msg.data.gpio0)
+            print("rx gpio1:", msg.data.gpio1)
+            print("rx gpio2:", msg.data.gpio2)
+            print("rx gpio3:", msg.data.gpio3)
+            print("rx gpio4:", msg.data.gpio4)
+            print("rx gpio5:", msg.data.gpio5)
+            print("rx gpio6:", msg.data.gpio6)
+            print("rx gpio7:", msg.data.gpio7)
 
-        if inner_msg == "data_msg":
-            if msg.sequence_number >= GpioInterface.SequenceNumber:
-                GpioInterface.Synchronized = True
-                print("rx gpio0:", msg.data_msg.gpio0)
-                print("rx gpio1:", msg.data_msg.gpio1)
-                print("rx gpio2:", msg.data_msg.gpio2)
-                print("rx gpio3:", msg.data_msg.gpio3)
-                print("rx gpio4:", msg.data_msg.gpio4)
-                print("rx gpio5:", msg.data_msg.gpio5)
-                print("rx gpio6:", msg.data_msg.gpio6)
-                print("rx gpio7:", msg.data_msg.gpio7)
-
-                GpioInterface.InputData = {
-                    GpioId.GPIO0: msg.data_msg.gpio0,
-                    GpioId.GPIO1: msg.data_msg.gpio1,
-                    GpioId.GPIO2: msg.data_msg.gpio2,
-                    GpioId.GPIO3: msg.data_msg.gpio3,
-                    GpioId.GPIO4: msg.data_msg.gpio4,
-                    GpioId.GPIO5: msg.data_msg.gpio5,
-                    GpioId.GPIO6: msg.data_msg.gpio6,
-                    GpioId.GPIO7: msg.data_msg.gpio7,
-                }
-            else:
-                print("Rejected data msg! ==========================#")
+            GpioInterface.InputData = {
+                GpioId.GPIO0: msg.data.gpio0,
+                GpioId.GPIO1: msg.data.gpio1,
+                GpioId.GPIO2: msg.data.gpio2,
+                GpioId.GPIO3: msg.data.gpio3,
+                GpioId.GPIO4: msg.data.gpio4,
+                GpioId.GPIO5: msg.data.gpio5,
+                GpioId.GPIO6: msg.data.gpio6,
+                GpioId.GPIO7: msg.data.gpio7,
+            }
 
 
 def receive_gpio_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:

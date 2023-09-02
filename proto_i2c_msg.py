@@ -8,20 +8,36 @@ class I2cId(Enum):
     I2C1 = 1
 
 
+class AddrSize(Enum):
+    ZERO_BYTES = 0
+    ONE_BYTE = 1
+    TWO_BYTES = 2
+
+
 I2C_INSTANCE = {
     I2cId.I2C0: None,
     I2cId.I2C1: None
 }
 
 
-class I2cMasterRequest:
-    def __init__(self, slave_addr: int, write_data: bytes, read_size: int):
+class I2cMasterWriteRequest:
+    def __init__(self, slave_addr: int, write_data: bytes, send_stop=True):
         self.pending = True
         self.request_id = None
         self.slave_addr = slave_addr
-        self.read_size = read_size
         self.write_data = write_data
-        self.read_data = None
+        self.send_stop = send_stop
+
+
+class I2cMasterReadRequest:
+    def __init__(self, slave_addr: int, reg_addr: int, addr_size: AddrSize, read_size: int, send_stop=True):
+        self.pending = True
+        self.request_id = None
+        self.slave_addr = slave_addr
+        self.reg_addr = reg_addr
+        self.addr_size = addr_size
+        self.read_size = read_size
+        self.send_stop = send_stop
 
 
 class I2cInterface:
@@ -58,7 +74,7 @@ class I2cInterface:
     def get_completed_master_request_ids(self) -> list:
         return [request.request_id for rid, request in self.master_requests if not request.pending]
 
-    def get_master_request(self, request_id: int, remove_completed=True) -> I2cMasterRequest:
+    def get_master_request(self, request_id: int, remove_completed=True):
         if request_id not in self.master_requests.keys():
             return None
 
@@ -74,27 +90,36 @@ class I2cInterface:
         msg = i2c_pb2.I2cMsg()
         msg.i2c_id = self.i2c_idm
         msg.sequence_number = self.sequence_number
-        msg.cfg_msg.clock_rate = self.i2c_clock
+        msg.cfg.clock_rate = self.i2c_clock
 
         msg_bytes = msg.SerializeToString()
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_I2C.value, msg_bytes, 0)
 
-    def send_master_request_msg(self, request: I2cMasterRequest) -> int:
+    def send_master_request_msg(self, request) -> int:
         self.sequence_number += 1
         self.request_id_counter += 1
 
         request.pending = True
         request.request_id = self.request_id_counter
-        request.read_data = None
         self.master_requests[request.request_id] = request
 
         msg = i2c_pb2.I2cMsg()
         msg.i2c_id = self.i2c_idm
         msg.sequence_number = self.sequence_number
-        msg.data_msg.request_id = request.request_id
-        msg.data_msg.slave_addr = request.slave_addr
-        msg.data_msg.read_size = request.read_size
-        msg.data_msg.data = request.write_data
+
+        if isinstance(request, I2cMasterWriteRequest):
+            msg.master_write.request_id = request.request_id
+            msg.master_write.slave_addr = request.slave_addr
+            msg.master_write.send_stop = request.send_stop
+            msg.master_write.write_data = request.write_data
+
+        elif isinstance(request, I2cMasterReadRequest):
+            msg.master_read.request_id = request.request_id
+            msg.master_read.slave_addr = request.slave_addr
+            msg.master_read.send_stop = request.send_stop
+            msg.master_read.reg_addr = request.reg_addr
+            msg.master_read.addr_size = request.addr_size
+            msg.master_read.read_size = request.read_size
 
         msg_bytes = msg.SerializeToString()
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_I2C.value, msg_bytes, 0)
@@ -102,19 +127,18 @@ class I2cInterface:
 
     def receive_msg_cb(self, msg: i2c_pb2.I2cMsg) -> None:
         inner_msg = msg.WhichOneof("msg")
-
-        if inner_msg == "data_msg":
-            request_id = msg.data_msg.request_id
-            self.master_requests[request_id].read_data = msg.data_msg.data
-            self.master_requests[request_id].pending = False
-
-        elif inner_msg == "status_msg":
+        if inner_msg == "master_status":
             if msg.sequence_number >= self.sequence_number:
-                self.master_queue_space = msg.status_msg.master_queue_space
-                self.master_buffer_space = msg.status_msg.master_buffer_space
+                self.master_queue_space = msg.master_status.queue_space
+                self.master_buffer_space = msg.master_status.buffer_space
 
-        else:
-            print("Rejected I2C msg! ==========================#")
+            request_id = msg.master_status.request_id
+            if request_id not in self.master_requests.keys():
+                return
+
+            self.master_requests[request_id].pending = False
+            if isinstance(self.master_requests[request_id], I2cMasterReadRequest):
+                self.master_requests[request_id].read_data = msg.master_status.read_data
 
 
 def receive_i2c_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:

@@ -45,7 +45,7 @@ class UartInterface:
         msg = uart_pb2.UartMsg()
         msg.uart_id = self.uart_idm
         msg.sequence_number = self.sequence_number
-        msg.cfg_msg.baud_rate = self.uart_baud
+        msg.cfg.baud_rate = self.uart_baud
 
         msg_bytes = msg.SerializeToString()
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_UART.value, msg_bytes, 0)
@@ -58,7 +58,7 @@ class UartInterface:
         msg = uart_pb2.UartMsg()
         msg.uart_id = self.uart_idm
         msg.sequence_number = self.sequence_number
-        msg.data_msg.data = data
+        msg.data.data = data
 
         msg_bytes = msg.SerializeToString()
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_UART.value, msg_bytes, 0)
@@ -66,17 +66,17 @@ class UartInterface:
     def receive_msg_cb(self, msg: uart_pb2.UartMsg):
         inner_msg = msg.WhichOneof("msg")
 
-        if inner_msg == "data_msg":
-            self.rx_buffer += msg.data_msg.data
-        elif inner_msg == "status_msg":
+        if inner_msg == "data":
+            self.rx_buffer += msg.data.data
+        elif inner_msg == "status":
             if msg.sequence_number >= self.sequence_number:
-                self.tx_buffer_space = msg.status_msg.tx_space
-                self.tx_buffer_empty = msg.status_msg.tx_complete
+                self.tx_buffer_space = msg.status.tx_space
+                self.tx_buffer_empty = msg.status.tx_complete
 
                 print("Status: tx_complete {}, tx_space {}, tx_overflow {}, seq_num {}"
-                      .format(msg.status_msg.tx_complete, msg.status_msg.tx_space,
-                              msg.status_msg.tx_overflow, msg.sequence_number))
-                if msg.status_msg.tx_overflow:
+                      .format(msg.status.tx_complete, msg.status.tx_space,
+                              msg.status.tx_overflow, msg.sequence_number))
+                if msg.status.tx_overflow:
                     raise Exception("Tx overflow!")
         else:
             print("Rejected UART msg! ==========================#")

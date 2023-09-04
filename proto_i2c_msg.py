@@ -48,7 +48,7 @@ class I2cInterface:
         self.sequence_number = 0
         self.request_id_counter = 0
         self.master_queue_space = 8
-        self.master_buffer_space = 64
+        self.master_buffer_space = 128
         self.master_requests = {}
 
         if self.i2c_id == I2cId.I2C0:
@@ -64,9 +64,17 @@ class I2cInterface:
         if I2C_INSTANCE[self.i2c_id] is self:
             I2C_INSTANCE[self.i2c_id] = None
 
-    def can_accept_master_request(self, write_size: int, read_size: int) -> bool:
-        return (self.master_queue_space > 0 and
-                self.master_buffer_space >= (write_size + read_size))
+    def can_accept_request(self, request) -> bool:
+        accept = False
+
+        if isinstance(request, I2cMasterWriteRequest):
+            accept = self.master_queue_space > 0 and \
+                     self.master_buffer_space >= len(request.write_data)
+        elif isinstance(request, I2cMasterReadRequest):
+            accept = self.master_queue_space > 0 and \
+                     self.master_buffer_space >= request.read_size
+
+        return accept
 
     def get_pending_master_request_ids(self) -> list:
         return [request.request_id for rid, request in self.master_requests if request.pending]

@@ -27,17 +27,15 @@ MASTER_WRITE_REQUESTS = [{"write": ''.join(random.choice(string.ascii_letters + 
 def i2c_send(i2c_int):
     global REQUEST_COUNTER, TX_HISTORY, REQUEST_IDS
 
-    write_data = "This is a test. ({}).".format(REQUEST_COUNTER)
-    read_size = 0
+    # write_data = "This is a test. ({}).".format(REQUEST_COUNTER)
+    # tx_data = bytes(write_data, 'ascii')
 
-    if (i2c_int.can_accept_master_request(len(write_data), read_size)
-            and REQUEST_COUNTER < REQUEST_LOOPS):
-        print("Data: '{}'".format(write_data))
-        tx_data = bytes(write_data, 'ascii')
+    tx_data = bytes.fromhex("20 05")
+    print("Data: '{}'".format(tx_data))
 
-        request = pm.I2cMasterWriteRequest(slave_addr=0x05, write_data=tx_data)
+    request = pm.I2cMasterWriteRequest(slave_addr=25, write_data=tx_data)
+    if i2c_int.can_accept_request(request) and REQUEST_COUNTER < REQUEST_LOOPS:
         REQUEST_IDS.append(i2c_int.send_master_request_msg(request=request))
-
         REQUEST_COUNTER += 1
         TX_HISTORY += tx_data
 

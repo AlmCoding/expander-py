@@ -33,7 +33,8 @@ def i2c_send(i2c_int):
     tx_data = bytes.fromhex("20 05")
     print("Data: '{}'".format(tx_data))
 
-    request = pm.I2cMasterWriteRequest(slave_addr=25, write_data=tx_data)
+    request = pm.I2cMasterRequest(slave_addr=25, write_data=tx_data, read_size=0)
+    request = pm.I2cMasterRequest(slave_addr=25, write_data=bytes.fromhex("20"), read_size=1)
     if i2c_int.can_accept_request(request) and REQUEST_COUNTER < REQUEST_LOOPS:
         REQUEST_IDS.append(i2c_int.send_master_request_msg(request=request))
         REQUEST_COUNTER += 1

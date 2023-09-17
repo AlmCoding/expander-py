@@ -2,6 +2,8 @@ from proto.proto_py import uart_pb2
 from enum import Enum
 import tiny_frame as tf
 
+UART_TX_BUFFER_SPACE = 64
+
 
 class UartId(Enum):
     UART0 = 0
@@ -19,7 +21,7 @@ class UartInterface:
         self.uart_id = uart_id
         self.uart_baud = baud_rate
         self.sequence_number = 0
-        self.tx_buffer_space = 64
+        self.tx_buffer_space = UART_TX_BUFFER_SPACE
         self.tx_buffer_empty = True
         self.rx_buffer = bytearray()
 

@@ -12,37 +12,59 @@ import serial
 import tiny_frame
 import proto_i2c_msg as pm
 
-REQUEST_LOOPS = 1
-MIN_TX_SIZE = 1
-MAX_DATA_SIZE = 64
-TX_HISTORY = bytearray()
-REQUEST_COUNTER = 0
-REQUEST_IDS = []
-
-MASTER_WRITE_REQUESTS = [{"write": ''.join(random.choice(string.ascii_letters + string.digits)
-                          for _ in range(random.randint(4, 6))),
-                          "read": 0} for i in range(10)]
+REQUEST_LOOPS = 10
 
 
-def i2c_send(i2c_int):
-    global REQUEST_COUNTER, TX_HISTORY, REQUEST_IDS
+def print_error(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
-    # write_data = "This is a test. ({}).".format(REQUEST_COUNTER)
-    # tx_data = bytes(write_data, 'ascii')
 
-    tx_data = bytes.fromhex("20 05")
-    print("Data: '{}'".format(tx_data))
+def generate_master_write_read_requests(count: int) -> list[pm.I2cMasterRequest]:
+    master_requests = []
+    for _ in range(count):
+        reg_addr = random.choice([0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26])
+        reg_val = random.randint(0, 255)
+        write_request = pm.I2cMasterRequest(slave_addr=25, write_data=bytes([reg_addr, reg_val]), read_size=0)
+        read_request = pm.I2cMasterRequest(slave_addr=25, write_data=bytes([reg_addr]), read_size=1)
+        master_requests.append(write_request)
+        master_requests.append(read_request)
+    return master_requests
 
-    request = pm.I2cMasterRequest(slave_addr=25, write_data=tx_data, read_size=0)
-    request = pm.I2cMasterRequest(slave_addr=25, write_data=bytes.fromhex("20"), read_size=1)
-    if i2c_int.can_accept_request(request) and REQUEST_COUNTER < REQUEST_LOOPS:
-        REQUEST_IDS.append(i2c_int.send_master_request_msg(request=request))
-        REQUEST_COUNTER += 1
-        TX_HISTORY += tx_data
+
+def check_complete_requests(requests: list[pm.I2cMasterRequest]):
+    for idx, request in enumerate(requests):
+        if request.status_code != pm.I2cMasterStatusCode.COMPLETE:
+            print_error("Request (id: {}, code: {}) [failed]".format(request.request_id, request.status_code))
+            continue
+
+        if request.read_size == 0:
+            print("Write request (id: {}) [ok]".format(request.request_id))
+            continue
+
+        write_data = requests[idx-1].write_data[1:]
+        if request.read_data != write_data:
+            print_error("Request (id: {}, code: {}) data mismatch {} != {}"
+                        .format(request.request_id, request.status_code, request.read_data, write_data))
+        else:
+            print("Read request (id: {}) [ok]".format(request.request_id))
+
+    requests.clear()
+
+
+def i2c_send(i2c_int, request_queue):
+    if len(request_queue) == 0:
+        return
+
+    # request = pm.I2cMasterRequest(slave_addr=25, write_data=tx_data, read_size=0)
+    # request = pm.I2cMasterRequest(slave_addr=25, write_data=bytes.fromhex("20"), read_size=30)
+
+    if i2c_int.can_accept_request(request_queue[0]):
+        i2c_int.send_master_request_msg(request=request_queue[0])
+        request_queue.pop(0)
 
 
 def main(arguments):
-    global TX_HISTORY, REQUEST_IDS
+    global REQUEST_LOOPS
     print("Uart test sender")
 
     with serial.Serial('COM4', 115200, timeout=1) as ser:
@@ -53,11 +75,20 @@ def main(arguments):
         # i2c_int.send_config_msg()
         time.sleep(1)
 
-        while True:
-            if len(REQUEST_IDS) == 0:
-                i2c_send(i2c_int)
+        requests_pipeline = generate_master_write_read_requests(REQUEST_LOOPS // 2)
+        requests_count = len(requests_pipeline)
+        requests_done = []
 
-            ids = i2c_int.get_completed_master_request_ids()
+        while True:
+            i2c_send(i2c_int, requests_pipeline)
+
+            requests = i2c_int.pop_complete_master_requests()
+            if len(requests):
+                requests_done += requests.values()
+
+            if len(requests_pipeline) == 0 and len(requests_done) == requests_count:
+                check_complete_requests(requests_done)
+                exit(0)
 
             if ser.in_waiting > 0:
                 # Read the incoming data

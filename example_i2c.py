@@ -12,7 +12,7 @@ import serial
 import tiny_frame
 import proto_i2c_msg as pm
 
-REQUEST_LOOPS = 10
+REQUEST_LOOPS = 100
 
 
 def print_error(*args, **kwargs):

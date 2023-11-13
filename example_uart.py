@@ -27,7 +27,7 @@ def uart_send(uart_int: pm.UartInterface):
     tx_data = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(size))
 
     if uart_int.can_accept_request(len(tx_data)) and TX_COUNTER < TX_LOOPS:
-        print("Data: '{}'".format(tx_data))
+        print("Data ({}): '{}'".format(len(tx_data), tx_data))
         tx_data = bytes(tx_data, 'ascii')
         uart_int.send_data_msg(tx_data)
 
@@ -39,7 +39,7 @@ def main(arguments):
     global TX_HISTORY
     print("Uart test sender")
 
-    with serial.Serial('COM4', 115200, timeout=1) as ser:
+    with serial.Serial('COM8', 115200, timeout=1) as ser:
         tf = tiny_frame.tf_init(ser.write)
         uart_int = pm.UartInterface(uart_id=pm.UartId.UART0, baud_rate=115200)
 

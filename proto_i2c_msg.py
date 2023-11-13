@@ -2,8 +2,8 @@ from proto.proto_py import i2c_pb2
 from enum import Enum
 import tiny_frame as tf
 
-I2C_MASTER_QUEUE_SPACE = 16
-I2C_MASTER_BUFFER_SPACE = 8
+I2C_MASTER_QUEUE_SPACE = 8
+I2C_MASTER_BUFFER_SPACE = 64
 
 
 class I2cId(Enum):
@@ -82,6 +82,9 @@ class I2cInterface:
 
         return accept
 
+    def can_accept_sequence(self, sequence) -> bool:
+        pass
+
     def update_free_space(self, request) -> None:
         if isinstance(request, I2cMasterRequest):
             self.master_queue_space -= 1
@@ -134,15 +137,31 @@ class I2cInterface:
         msg_bytes = msg.SerializeToString()
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_I2C.value, msg_bytes, 0)
 
+    def send_master_sequence(self, sequence: list) -> list[int]:
+        self.sequence_id_counter += 1
+        seq_idx = len(sequence) - 1
+        ids = []
+
+        for request in sequence:
+            request.sequence_id = self.sequence_id_counter
+            request.sequence_idx = seq_idx
+            ids.append(self.send_master_request_msg(request))
+            seq_idx -= 1
+
+        return ids
+
     def send_master_request_msg(self, request) -> int:
         self.sequence_number += 1
         self.request_id_counter += 1
-        self.sequence_id_counter += 1
 
         request.status_code = I2cMasterStatusCode.PENDING
         request.request_id = self.request_id_counter
-        request.sequence_id = self.sequence_id_counter
-        request.sequence_idx = 0
+
+        if request.sequence_id is None:
+            self.sequence_id_counter += 1
+            request.sequence_id = self.sequence_id_counter
+        if request.sequence_idx is None:
+            request.sequence_idx = 0
         self.master_requests[request.request_id] = request
         self.update_free_space(request)
 

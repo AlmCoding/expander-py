@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""A simple python script template.
+""" A simple python script template.
 """
 
 import sys
@@ -12,7 +12,7 @@ import serial
 import tiny_frame
 import proto_uart_msg as pm
 
-TX_LOOPS = 100
+TX_LOOPS = 1000
 TX_COUNTER = 0
 MIN_TX_SIZE = 1
 MAX_TX_SIZE = 64
@@ -39,7 +39,7 @@ def main(arguments):
     global TX_HISTORY
     print("Uart test sender")
 
-    with serial.Serial('COM8', 115200, timeout=1) as ser:
+    with serial.Serial('COM3', 115200, timeout=1) as ser:
         tf = tiny_frame.tf_init(ser.write)
         uart_int = pm.UartInterface(uart_id=pm.UartId.UART0, baud_rate=115200)
 

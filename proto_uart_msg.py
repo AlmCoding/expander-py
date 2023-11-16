@@ -72,13 +72,14 @@ class UartInterface:
             if msg.sequence_number >= self.sequence_number:
                 self.tx_buffer_empty = msg.status.tx_complete
                 self.tx_buffer_space = msg.status.tx_space
-                self.rx_buffer += msg.status.rx_data
 
                 print("Status: tx_complete {}, tx_space {}, tx_overflow {}, seq_num {}"
                       .format(msg.status.tx_complete, msg.status.tx_space,
                               msg.status.tx_overflow, msg.sequence_number))
                 if msg.status.tx_overflow:
                     raise Exception("Tx overflow!")
+
+            self.rx_buffer += msg.status.rx_data
         else:
             print("Rejected UART msg! ==========================#")
 

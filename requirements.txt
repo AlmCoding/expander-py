@@ -1,1 +1,4 @@
 pyserial
+scons
+protobuf
+grpcio-tools

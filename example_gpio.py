@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""A simple python script template.
+""" A simple python script template.
 """
 
 import sys
@@ -106,7 +106,7 @@ def main(arguments):
     global REVERSED
     print("Gpio test sender")
 
-    with serial.Serial('COM8', 115200, timeout=1) as ser:
+    with serial.Serial('COM3', 115200, timeout=1) as ser:
         tf = tiny_frame.tf_init(ser.write)
 
         # Configure gpio

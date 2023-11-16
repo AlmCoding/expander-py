@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""A simple python script template.
+""" A simple python script template.
 """
 
 import sys

@@ -4,12 +4,12 @@
 """
 
 import sys
-import enum
 import time
 import string
 import random
 import serial
-import tiny_frame
+from msg import tiny_frame
+
 
 INCLUDE_TINY_FRAME = True
 TX_LOOPS = 1000

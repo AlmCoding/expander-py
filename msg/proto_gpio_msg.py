@@ -1,6 +1,6 @@
 from proto.proto_py import gpio_pb2
 from enum import Enum
-import tiny_frame as tf
+import msg.tiny_frame as tf
 
 
 class GpioId(Enum):

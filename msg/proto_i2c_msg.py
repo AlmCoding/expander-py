@@ -1,6 +1,7 @@
 from proto.proto_py import i2c_pb2
 from enum import Enum
-import tiny_frame as tf
+import msg.tiny_frame as tf
+
 
 I2C_MASTER_QUEUE_SPACE = 4
 I2C_MASTER_BUFFER_SPACE = 64

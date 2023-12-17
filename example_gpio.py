@@ -4,13 +4,10 @@
 """
 
 import sys
-import enum
-import time
-import string
-import random
 import serial
-import tiny_frame
-import proto_gpio_msg as pm
+from msg import proto_gpio_msg as pm
+from msg import tiny_frame
+
 
 SET_LOOPS = 16 * 100
 SET_COUNTER = 0
@@ -42,7 +39,6 @@ def gpio_config():
             pm.GpioConfig(pm.GpioId.GPIO6, pm.GpioMode.OUTPUT_PUSHPULL),
             pm.GpioConfig(pm.GpioId.GPIO7, pm.GpioMode.OUTPUT_PUSHPULL),
         ])
-
     print("Send gpio config request")
 
 

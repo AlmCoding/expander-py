@@ -4,13 +4,12 @@
 """
 
 import sys
-import enum
-import time
 import string
 import random
 import serial
-import tiny_frame
-import proto_uart_msg as pm
+from msg import proto_uart_msg as pm
+from msg import tiny_frame
+
 
 TX_LOOPS = 1000
 TX_COUNTER = 0

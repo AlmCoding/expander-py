@@ -4,13 +4,12 @@
 """
 
 import sys
-import enum
-import time
 import string
 import random
 import serial
-import tiny_frame
-import proto_i2c_msg as pm
+from msg import proto_i2c_msg as pm
+import msg.tiny_frame as tiny_frame
+
 
 REQUEST_LOOPS = 4*100
 MIN_DATA_SIZE = 1

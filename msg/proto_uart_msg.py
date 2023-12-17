@@ -1,6 +1,7 @@
 from proto.proto_py import uart_pb2
 from enum import Enum
-import tiny_frame as tf
+import msg.tiny_frame as tf
+
 
 UART_TX_BUFFER_SPACE = 64
 

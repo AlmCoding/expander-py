@@ -14,16 +14,20 @@ import proto_uart_msg as pm
 
 TX_LOOPS = 1000
 TX_COUNTER = 0
-MIN_TX_SIZE = 1
-MAX_TX_SIZE = 64
+MIN_DATA_SIZE = 1
+MAX_DATA_SIZE = 64
 TX_HISTORY = bytearray()
+
+MAX_DATA_SIZE -= tiny_frame.TF_FRAME_OVERHEAD_SIZE + 24
+if MIN_DATA_SIZE >= MAX_DATA_SIZE:
+    MIN_DATA_SIZE = MAX_DATA_SIZE
 
 
 def uart_send(uart_int: pm.UartInterface):
-    global TX_COUNTER, TX_HISTORY, MIN_TX_SIZE, MAX_TX_SIZE
+    global TX_COUNTER, TX_HISTORY, MIN_DATA_SIZE, MAX_DATA_SIZE
 
     # tx_data = "This is a test. With little data ({}).".format(TX_COUNTER)
-    size = random.randint(MIN_TX_SIZE, min(MAX_TX_SIZE, max(uart_int.tx_buffer_space, MIN_TX_SIZE)))
+    size = random.randint(MIN_DATA_SIZE, min(MAX_DATA_SIZE, max(uart_int.tx_buffer_space, MIN_DATA_SIZE)))
     tx_data = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(size))
 
     if uart_int.can_accept_request(len(tx_data)) and TX_COUNTER < TX_LOOPS:
@@ -45,7 +49,6 @@ def main(arguments):
 
         # Configure uart
         uart_int.send_config_msg()
-        time.sleep(1)
 
         while True:
             uart_send(uart_int)

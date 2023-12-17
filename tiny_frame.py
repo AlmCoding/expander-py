@@ -3,7 +3,7 @@ from enum import Enum
 
 
 class TfMsgType(Enum):
-    TYPE_CTRL = 0x00
+    TYPE_ECHO = 0x00
     TYPE_UART = 0x01
     TYPE_I2C = 0x02
     TYPE_SPI = 0x03
@@ -14,20 +14,26 @@ class TfMsgType(Enum):
 
 
 TF_INSTANCE = TF.TinyFrame()
+TF_FRAME_START = 0x01
+TF_START_BYTES = 1  # 0x01 => 1 byte
+TF_ID_BYTES = 1
+TF_LEN_BYTES = 2
+TF_TYPE_BYTES = 1
+TF_CKSUM_BYTES = 2  # xor => 1 byte
+TF_FRAME_OVERHEAD_SIZE = TF_START_BYTES + TF_ID_BYTES + TF_LEN_BYTES + TF_TYPE_BYTES + TF_CKSUM_BYTES
 
 
 def tf_init(write_callback) -> TF.TinyFrame:
-    global TF_INSTANCE
+    global TF_INSTANCE, TF_FRAME_START, TF_ID_BYTES, TF_LEN_BYTES
     tf = TF_INSTANCE
 
-    tf.SOF_BYTE = 0x01
-    tf.ID_BYTES = 1
-    tf.LEN_BYTES = 1
-    tf.TYPE_BYTES = 1
+    tf.SOF_BYTE = TF_FRAME_START
+    tf.ID_BYTES = TF_ID_BYTES
+    tf.LEN_BYTES = TF_LEN_BYTES
+    tf.TYPE_BYTES = TF_TYPE_BYTES
     tf.CKSUM_TYPE = 'xor'
     tf.write = write_callback
     tf.add_fallback_listener(tf_fallback_cb)
-
     return tf
 
 

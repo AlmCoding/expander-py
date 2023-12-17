@@ -112,7 +112,6 @@ def main(arguments):
         # Configure gpio
         REVERSED = False
         gpio_config()
-        time.sleep(1)
         gpio_generate()
 
         while True:

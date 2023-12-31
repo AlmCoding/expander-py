@@ -4,11 +4,10 @@
 """
 
 import sys
-import string
-import random
 import serial
 from msg import proto_uart_msg as pm
 from msg import tiny_frame
+from helper import get_com_port, print_error, generate_ascii_data
 
 
 TX_LOOPS = 1000
@@ -24,16 +23,11 @@ if MIN_DATA_SIZE >= MAX_DATA_SIZE:
 
 def uart_send(uart_int: pm.UartInterface):
     global TX_COUNTER, TX_HISTORY, MIN_DATA_SIZE, MAX_DATA_SIZE
-
-    # tx_data = "This is a test. With little data ({}).".format(TX_COUNTER)
-    size = random.randint(MIN_DATA_SIZE, min(MAX_DATA_SIZE, max(uart_int.tx_buffer_space, MIN_DATA_SIZE)))
-    tx_data = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(size))
+    tx_data = generate_ascii_data(MIN_DATA_SIZE, min(MAX_DATA_SIZE, max(uart_int.tx_buffer_space, MIN_DATA_SIZE)))
 
     if uart_int.can_accept_request(len(tx_data)) and TX_COUNTER < TX_LOOPS:
-        print("Data ({}): '{}'".format(len(tx_data), tx_data))
-        tx_data = bytes(tx_data, 'ascii')
+        print("Data ({}): {}".format(len(tx_data), tx_data))
         uart_int.send_data_msg(tx_data)
-
         TX_COUNTER += 1
         TX_HISTORY += tx_data
 
@@ -42,7 +36,7 @@ def main(arguments):
     global TX_HISTORY
     print("Uart test sender")
 
-    with serial.Serial('COM3', 115200, timeout=1) as ser:
+    with serial.Serial(get_com_port(), 115200, timeout=1) as ser:
         tf = tiny_frame.tf_init(ser.write)
         uart_int = pm.UartInterface(uart_id=pm.UartId.UART0, baud_rate=115200)
 

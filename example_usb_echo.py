@@ -5,10 +5,9 @@
 
 import sys
 import time
-import string
-import random
 import serial
 from msg import tiny_frame
+from helper import get_com_port, print_error, generate_ascii_data
 
 
 INCLUDE_TINY_FRAME = True
@@ -25,19 +24,12 @@ if INCLUDE_TINY_FRAME:
         MIN_DATA_SIZE = MAX_DATA_SIZE
 
 
-def generate_data():
-    global TX_COUNTER, MIN_DATA_SIZE, MAX_DATA_SIZE
-    size = random.randint(MIN_DATA_SIZE, MAX_DATA_SIZE)
-    tx_data = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(size))
-    print("Send (%d): '%s' (%d bytes)" % (TX_COUNTER, tx_data, size))
-    return tx_data.encode("utf-8")
-
-
 def send_data(ser, tf):
     global TX_COUNTER, TX_HISTORY, MIN_DATA_SIZE, MAX_DATA_SIZE, BYTE_COUNTER, INCLUDE_TINY_FRAME
     # if len(TX_HISTORY) == 0 and TX_COUNTER < TX_LOOPS:
     if TX_COUNTER < TX_LOOPS:
-        tx_data = generate_data()
+        tx_data = generate_ascii_data(MIN_DATA_SIZE, MAX_DATA_SIZE)
+        print("Send (%d): %s (%d bytes)" % (TX_COUNTER, tx_data, len(tx_data)))
         if INCLUDE_TINY_FRAME:
             tf.send(tiny_frame.TfMsgType.TYPE_ECHO.value, tx_data, 0)
         else:
@@ -51,7 +43,7 @@ def receive_data(rx_data):
     global TX_HISTORY, BYTE_COUNTER
     rx_len = len(rx_data)
     if rx_data == TX_HISTORY[:rx_len]:
-        print("Loop ok for {} bytes: '{}'".format(rx_len, rx_data.decode("ascii")))
+        print("Loop ok for {} bytes: {}".format(rx_len, rx_data))
         TX_HISTORY = TX_HISTORY[rx_len:]
     else:
         print("Data missmatch detected!")
@@ -68,7 +60,7 @@ def main(arguments):
     global TX_HISTORY, BYTE_COUNTER
     print("Usb loop test")
 
-    with serial.Serial('COM3', 115200, timeout=1) as ser:
+    with serial.Serial(get_com_port(), 115200, timeout=1) as ser:
         tf = tiny_frame.tf_init(ser.write)
         tiny_frame.tf_register_callback(tiny_frame.TfMsgType.TYPE_ECHO, receive_echo_msg_cb)
         start = time.time()

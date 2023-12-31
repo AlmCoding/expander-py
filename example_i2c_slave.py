@@ -4,14 +4,14 @@
 """
 
 import sys
-import string
 import random
 import serial
 from msg import proto_i2c_msg as pm
 import msg.tiny_frame as tiny_frame
+from helper import get_com_port, print_error, generate_ascii_data
 
 
-REQUEST_LOOPS = 4*100
+REQUEST_LOOPS = 4 * 1000
 MIN_DATA_SIZE = 1
 MAX_DATA_SIZE = 64
 
@@ -20,21 +20,11 @@ if MIN_DATA_SIZE >= MAX_DATA_SIZE:
     MIN_DATA_SIZE = MAX_DATA_SIZE
 
 
-def print_error(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
-
-
-def generate_data():
-    global MIN_DATA_SIZE, MAX_DATA_SIZE
-    size = random.randint(MIN_DATA_SIZE, MAX_DATA_SIZE)
-    tx_data = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(size))
-    return tx_data.encode("utf-8")
-
-
 def generate_slave_write_read_requests(count: int) -> list[pm.I2cSlaveRequest]:
+    global MIN_DATA_SIZE, MAX_DATA_SIZE
     slave_requests = []
     for _ in range(count):
-        tx_data = generate_data()
+        tx_data = generate_ascii_data(MIN_DATA_SIZE, MAX_DATA_SIZE)
         mem_addr = random.randint(0, pm.I2C_SLAVE_BUFFER_SPACE - len(tx_data) - 1)
 
         write_request = pm.I2cSlaveRequest(write_addr=mem_addr, write_data=tx_data, read_addr=0, read_size=0)
@@ -61,7 +51,6 @@ def check_complete_requests(requests: list[pm.I2cSlaveRequest]):
                         .format(request.request_id, request.status_code, request.mem_data.hex(), write_data.hex()))
         else:
             print("Read request (id: {}) [ok]".format(request.request_id))
-
     requests.clear()
 
 
@@ -74,16 +63,16 @@ def i2c_send(i2c_int, request_queue):
 
     if i2c_int.can_accept_request(request_queue[0]):
         rid = i2c_int.send_slave_request_msg(request=request_queue[0])
-        print("Req: {}, w_data: '{}' ({}), r_size: {}".format(
-              rid, request_queue[0].write_data.hex(), len(request_queue[0].write_data), request_queue[0].read_size))
+        print("Req: {}, w_data: {} ({}), r_size: {}".format(
+              rid, request_queue[0].write_data, len(request_queue[0].write_data), request_queue[0].read_size))
         request_queue.pop(0)
 
 
 def main(arguments):
     global REQUEST_LOOPS
-    print("I2c test sender")
+    print("I2cSlave memory testing")
 
-    with serial.Serial('COM3', 115200, timeout=1) as ser:
+    with serial.Serial(get_com_port(), 115200, timeout=1) as ser:
         tf = tiny_frame.tf_init(ser.write)
         i2c_int0 = pm.I2cInterface(i2c_id=pm.I2cId.I2C0, i2c_addr=0x01, i2c_clock=400000, i2c_pullups=True)
         i2c_int1 = pm.I2cInterface(i2c_id=pm.I2cId.I2C1, i2c_addr=0x02, i2c_clock=400000, i2c_pullups=False)

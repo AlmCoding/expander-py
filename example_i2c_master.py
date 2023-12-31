@@ -7,45 +7,35 @@ import sys
 import random
 import serial
 from msg import proto_i2c_msg as pm
-import msg.tiny_frame as tiny_frame
+from msg import tiny_frame
 from helper import get_com_port, print_error, generate_ascii_data
 
-REQUEST_LOOPS = 4
-MIN_DATA_SIZE = 1
-MAX_DATA_SIZE = 64
 
-MAX_DATA_SIZE -= tiny_frame.TF_FRAME_OVERHEAD_SIZE + 24
-if MIN_DATA_SIZE >= MAX_DATA_SIZE:
-    MIN_DATA_SIZE = MAX_DATA_SIZE
+REQUEST_LOOPS = 4 * 100
+MAX_DATA_SIZE = 32
 
 
-def generate_master_write_requests(slave_addr: int, count: int) -> list[pm.I2cMasterRequest]:
-    global MIN_DATA_SIZE, MAX_DATA_SIZE
+def generate_master_write_read_requests(slave_addr: int, count: int,
+                                        start_addr: int, end_addr: int) -> list[pm.I2cMasterRequest]:
+    global MAX_DATA_SIZE
     master_requests = []
     for _ in range(count):
-        tx_data = generate_ascii_data(MIN_DATA_SIZE, MAX_DATA_SIZE)
-        mem_addr = 42  # random.randint(0, pm.I2C_SLAVE_BUFFER_SPACE - len(tx_data) - 1)
-        tx_bytes = bytearray(mem_addr.to_bytes(2, 'little')) + bytearray(tx_data)
-        write_request = pm.I2cMasterRequest(slave_addr=slave_addr, write_data=bytes(tx_bytes), read_size=0)
+        mem_addr = random.randint(start_addr, end_addr)
+        addr_bytes = mem_addr.to_bytes(2, 'big')
+        data_bytes = generate_ascii_data(1, min(end_addr - mem_addr, MAX_DATA_SIZE))
+        tx_bytes = bytes(bytearray(addr_bytes) + bytearray(data_bytes))
+
+        write_request = pm.I2cMasterRequest(slave_addr=slave_addr, write_data=tx_bytes, read_size=0)
+        read_request = pm.I2cMasterRequest(slave_addr=slave_addr, write_data=addr_bytes, read_size=len(data_bytes))
+
         master_requests.append(write_request)
+        master_requests.append(read_request)
     return master_requests
 
 
-def generate_master_read_requests(slave_addr: int, count: int) -> list[pm.I2cMasterRequest]:
-    global MIN_DATA_SIZE, MAX_DATA_SIZE
-    master_requests = []
-    for _ in range(count):
-        mem_addr = 42  # random.randint(0, pm.I2C_SLAVE_BUFFER_SPACE - MIN_DATA_SIZE - 1)
-        read_size = 25  # random.randint(MIN_DATA_SIZE, min(pm.I2C_SLAVE_BUFFER_SPACE - mem_addr, MAX_DATA_SIZE))
-        tx_bytes = mem_addr.to_bytes(2, 'little')
-        write_request = pm.I2cMasterRequest(slave_addr=slave_addr, write_data=tx_bytes, read_size=read_size)
-        master_requests.append(write_request)
-    return master_requests
-
-
-def check_complete_requests(requests: list[pm.I2cSlaveRequest]):
+def check_complete_requests(requests: list[pm.I2cMasterRequest]):
     for idx, request in enumerate(requests):
-        if request.status_code != pm.I2cSlaveStatusCode.COMPLETE:
+        if request.status_code != pm.I2cMasterStatusCode.COMPLETE:
             print_error("Request (id: {}, code: {}) [failed]".format(request.request_id, request.status_code))
             continue
 
@@ -53,10 +43,10 @@ def check_complete_requests(requests: list[pm.I2cSlaveRequest]):
             print("Write request (id: {}) [ok]".format(request.request_id))
             continue
 
-        write_data = requests[idx - 1].write_data
-        if request.mem_data != write_data:
+        write_data = requests[idx-1].write_data[2:]
+        if request.read_data != write_data:
             print_error("Request (id: {}, code: {}) data mismatch {} != {}"
-                        .format(request.request_id, request.status_code, request.mem_data.hex(), write_data.hex()))
+                        .format(request.request_id, request.status_code, request.read_data.hex(), write_data.hex()))
         else:
             print("Read request (id: {}) [ok]".format(request.request_id))
     requests.clear()
@@ -74,7 +64,7 @@ def i2c_send_master_request(i2c_int, request_queue):
 
 def main(arguments):
     global REQUEST_LOOPS
-    print("I2c test sender")
+    print("I2cMaster testing")
 
     with serial.Serial(get_com_port(), 115200, timeout=1) as ser:
         tf = tiny_frame.tf_init(ser.write)
@@ -85,19 +75,22 @@ def main(arguments):
         # i2c_int0.send_config_msg()
         # i2c_int1.send_config_msg()
 
-        master_requests_pipeline = generate_master_write_requests(slave_addr=0x02, count=REQUEST_LOOPS)
-        # slave_access_expects = derive_slave_access_requests()
-        # master_requests_pipeline = generate_master_read_requests(slave_addr=0x02, count=REQUEST_LOOPS)
-        i2c_send_master_request(i2c_int0, master_requests_pipeline)
-
-        exit(0)
-
-        master_requests_count = len(master_requests_pipeline)
-        master_requests_done = []
+        requests_pipeline0 = generate_master_write_read_requests(slave_addr=0x02, count=REQUEST_LOOPS // 4,
+                                                                 start_addr=0, end_addr=pm.I2C_SLAVE_BUFFER_SPACE-1)
+        requests_pipeline1 = generate_master_write_read_requests(slave_addr=0x01, count=REQUEST_LOOPS // 4,
+                                                                 start_addr=0, end_addr=pm.I2C_SLAVE_BUFFER_SPACE-1)
+        # requests_pipeline1 = []
+        requests_count0 = len(requests_pipeline0)
+        requests_count1 = len(requests_pipeline1)
+        requests_done0 = []
+        requests_done1 = []
 
         while True:
-            requests0 = i2c_int0.pop_complete_slave_requests()
-            requests1 = i2c_int1.pop_complete_slave_requests()
+            i2c_send_master_request(i2c_int0, requests_pipeline0)
+            i2c_send_master_request(i2c_int1, requests_pipeline1)
+
+            requests0 = i2c_int0.pop_complete_master_requests()
+            requests1 = i2c_int1.pop_complete_master_requests()
             requests_done0 += requests0.values()
             requests_done1 += requests1.values()
 

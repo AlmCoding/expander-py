@@ -55,7 +55,7 @@ class I2cMasterRequest:
 
 class I2cSlaveRequest:
     def __init__(self, write_addr: int, write_data: bytes, read_addr: int,  read_size: int, callback_fn=None):
-        self.status_code = I2cMasterStatusCode.NOT_INIT
+        self.status_code = I2cSlaveStatusCode.NOT_INIT
         self.request_id = None
         self.write_addr = write_addr
         self.write_data = write_data
@@ -63,6 +63,17 @@ class I2cSlaveRequest:
         self.read_size = read_size
         self.mem_data = None
         self.callback_fn = callback_fn
+
+
+class I2cSlaveAccess:
+    def __init__(self, access_id: int, status_code: I2cSlaveStatusCode,
+                 write_addr: int, write_data: bytes, read_addr: int, read_size: int):
+        self.status_code = status_code
+        self.access_id = access_id
+        self.write_addr = write_addr
+        self.write_data = write_data
+        self.read_addr = read_addr
+        self.read_size = read_size
 
 
 class I2cInterface:
@@ -80,6 +91,7 @@ class I2cInterface:
         self.master_requests = {}
         self.slave_queue_space = I2C_SLAVE_QUEUE_SPACE
         self.slave_requests = {}
+        self.slave_access_notifications = {}
 
         if self.i2c_id == I2cId.I2C0:
             self.i2c_idm = i2c_pb2.I2cId.I2C0
@@ -170,6 +182,11 @@ class I2cInterface:
         for rid in complete_requests.keys():
             del self.slave_requests[rid]
         return complete_requests
+
+    def pop_slave_access_notifications(self) -> dict[I2cSlaveAccess]:
+        notifications = self.slave_access_notifications.copy()
+        self.slave_access_notifications.clear()
+        return notifications
 
     def send_config_msg(self) -> None:
         self.sequence_number += 1
@@ -279,15 +296,27 @@ class I2cInterface:
                 self.slave_queue_space = msg.slave_status.queue_space
 
             request_id = msg.slave_status.request_id
-            if request_id not in self.slave_requests.keys():
-                Exception("Unknown request (id:{})".format(request_id))
+            access_id = msg.slave_status.access_id
+            if request_id > 0:
+                if request_id not in self.slave_requests.keys():
+                    Exception("Unknown request (id:{})".format(request_id))
 
-            print("Rsp to req: {}".format(request_id))
-            self.slave_requests[request_id].status_code = I2cSlaveStatusCode(msg.slave_status.status_code)
-            self.slave_requests[request_id].mem_data = msg.slave_status.mem_data
-            if self.slave_requests[request_id].callback_fn:
-                request = self.slave_requests.pop(request_id)
-                request.callback_fn(request)
+                print("Response to req: {}".format(request_id))
+                self.slave_requests[request_id].status_code = I2cSlaveStatusCode(msg.slave_status.status_code)
+                self.slave_requests[request_id].mem_data = msg.slave_status.mem_data
+                if self.slave_requests[request_id].callback_fn:
+                    request = self.slave_requests.pop(request_id)
+                    request.callback_fn(request)
+
+            elif access_id > 0:
+                if access_id in self.slave_access_notifications.keys():
+                    Exception("Duplicate access (id:{})".format(request_id))
+
+                print("Notification to acc: {}".format(access_id))
+                notification = I2cSlaveAccess(msg.slave_status.access_id, msg.slave_status.status_code,
+                                              msg.slave_status.write_addr, msg.slave_status.mem_data,
+                                              msg.slave_status.read_addr, msg.slave_status.read_size)
+                self.slave_access_notifications[notification.access_id] = notification
 
 
 def receive_i2c_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:

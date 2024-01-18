@@ -11,7 +11,7 @@ import msg.tiny_frame as tiny_frame
 from helper import get_com_port, print_error, generate_ascii_data
 
 
-REQUEST_LOOPS = 4 * 1000
+REQUEST_LOOPS = 4 * 100
 MIN_DATA_SIZE = 1
 MAX_DATA_SIZE = 64
 

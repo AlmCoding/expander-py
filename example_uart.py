@@ -10,7 +10,7 @@ from msg import tiny_frame
 from helper import get_com_port, print_error, generate_ascii_data
 
 
-TX_LOOPS = 1000
+TX_LOOPS = 100
 TX_COUNTER = 0
 MIN_DATA_SIZE = 1
 MAX_DATA_SIZE = 64

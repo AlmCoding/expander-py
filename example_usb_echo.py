@@ -11,7 +11,7 @@ from helper import get_com_port, print_error, generate_ascii_data
 
 
 INCLUDE_TINY_FRAME = True
-TX_LOOPS = 1000
+TX_LOOPS = 10000
 TX_COUNTER = 0
 MIN_DATA_SIZE = 1
 MAX_DATA_SIZE = 64

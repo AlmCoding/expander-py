@@ -7,9 +7,10 @@ import sys
 import serial
 from msg import proto_gpio_msg as pm
 from msg import tiny_frame
+from helper import get_com_port, print_error
 
 
-SET_LOOPS = 16 * 100
+SET_LOOPS = 16 * 10
 SET_COUNTER = 0
 OUTPUT_PATTERN = 1
 REVERSED = False
@@ -102,7 +103,7 @@ def main(arguments):
     global REVERSED
     print("Gpio test sender")
 
-    with serial.Serial('COM3', 115200, timeout=1) as ser:
+    with serial.Serial(get_com_port(), 115200, timeout=1) as ser:
         tf = tiny_frame.tf_init(ser.write)
 
         # Configure gpio

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-""" A simple python script template.
+""" Read write commands to I2C master (Suitable for external slave, e.g. FRAM)
 """
 
 import sys
@@ -10,7 +10,7 @@ from msg import tiny_frame
 from helper import (get_com_port, print_error, generate_master_write_read_requests,
                     i2c_send_master_request, verify_master_write_read_requests)
 
-REQUEST_LOOPS = 4 * 100
+REQUEST_LOOPS = 4 * 10
 MAX_DATA_SIZE = 32
 
 

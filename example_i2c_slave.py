@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-""" A simple python script template.
+""" Write and read requests to the I2C slave memory (no I2C communication involved)
 """
 
 import sys
@@ -11,7 +11,7 @@ import msg.tiny_frame as tiny_frame
 from helper import get_com_port, print_error, generate_ascii_data
 
 
-REQUEST_LOOPS = 4 * 100
+REQUEST_LOOPS = 4 * 10000
 MIN_DATA_SIZE = 1
 MAX_DATA_SIZE = 64
 

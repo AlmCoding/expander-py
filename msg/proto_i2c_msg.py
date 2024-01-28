@@ -120,6 +120,11 @@ class I2cInterface:
                 accept = True
             elif self.master_buffer_space2 >= (len(request.write_data) + request.read_size):
                 accept = True
+
+            if accept:
+                print("Accept master request ok (sp1: %d, sp2: %d)" %
+                      (self.master_buffer_space1, self.master_buffer_space2))
+
         elif isinstance(request, I2cSlaveRequest) and self.slave_queue_space > 0:
             accept = True
 
@@ -132,21 +137,25 @@ class I2cInterface:
         if isinstance(request, I2cMasterRequest):
             self.master_queue_space -= 1
 
-            if self.master_buffer_space1 >= (len(request.write_data) + request.read_size):
-                self.master_buffer_space1 -= (len(request.write_data) + request.read_size)
+            bigger_section = max(len(request.write_data), request.read_size)
+            smaller_section = min(len(request.write_data), request.read_size)
 
-            elif self.master_buffer_space1 >= len(request.write_data) and \
-                    self.master_buffer_space2 >= request.read_size:
-                self.master_buffer_space1 -= len(request.write_data)
-                self.master_buffer_space2 -= request.read_size
+            if self.master_buffer_space1 >= (bigger_section + smaller_section):
+                self.master_buffer_space1 -= (bigger_section + smaller_section)
 
-            elif self.master_buffer_space1 >= request.read_size and \
-                    self.master_buffer_space2 >= len(request.write_data):
-                self.master_buffer_space1 -= request.read_size
-                self.master_buffer_space2 -= len(request.write_data)
+            elif self.master_buffer_space1 >= bigger_section and self.master_buffer_space2 >= smaller_section:
+                self.master_buffer_space1 = self.master_buffer_space2 - smaller_section
+                self.master_buffer_space2 = 0
 
-            elif self.master_buffer_space2 >= (len(request.write_data) + request.read_size):
-                self.master_buffer_space2 -= (len(request.write_data) + request.read_size)
+            elif self.master_buffer_space2 >= bigger_section and self.master_buffer_space1 >= smaller_section:
+                self.master_buffer_space1 = self.master_buffer_space2 - bigger_section
+                self.master_buffer_space2 = 0
+
+            elif self.master_buffer_space2 >= (bigger_section + smaller_section):
+                self.master_buffer_space2 -= (bigger_section + smaller_section)
+
+            print("Update space after send master request (id: %d, sp1: %d, sp2: %d)" %
+                  (request.request_id, self.master_buffer_space1, self.master_buffer_space2))
 
         elif isinstance(request, I2cSlaveRequest):
             self.slave_queue_space -= 1
@@ -275,15 +284,22 @@ class I2cInterface:
 
     def receive_msg_cb(self, msg: i2c_pb2.I2cMsg) -> None:
         inner_msg = msg.WhichOneof("msg")
+        update_space = False
         if inner_msg == "master_status":
             if msg.sequence_number >= self.sequence_number:
                 self.master_queue_space = msg.master_status.queue_space
                 self.master_buffer_space1 = msg.master_status.buffer_space1
                 self.master_buffer_space2 = msg.master_status.buffer_space2
+                update_space = True
 
             request_id = msg.master_status.request_id
             if request_id not in self.master_requests.keys():
-                Exception("Unknown request (id:{})".format(request_id))
+                raise Exception("Unknown master request (id: %d)" % request_id)
+            if update_space:
+                print("Response to master request (id: %d) | Update (sp1: %d, sp2: %d)" %
+                      (request_id, self.master_buffer_space1, self.master_buffer_space2))
+            else:
+                print("Response to master request (id: %d)" % request_id)
 
             self.master_requests[request_id].status_code = I2cMasterStatusCode(msg.master_status.status_code)
             self.master_requests[request_id].read_data = msg.master_status.read_data
@@ -299,9 +315,9 @@ class I2cInterface:
             access_id = msg.slave_status.access_id
             if request_id > 0:
                 if request_id not in self.slave_requests.keys():
-                    Exception("Unknown request (id:{})".format(request_id))
+                    raise Exception("Unknown slave request (id: %d)" % request_id)
+                print("Response to slave request (id: %d)" % request_id)
 
-                print("Response to req: {}".format(request_id))
                 self.slave_requests[request_id].status_code = I2cSlaveStatusCode(msg.slave_status.status_code)
                 self.slave_requests[request_id].mem_data = msg.slave_status.mem_data
                 if self.slave_requests[request_id].callback_fn:
@@ -310,9 +326,9 @@ class I2cInterface:
 
             elif access_id > 0:
                 if access_id in self.slave_access_notifications.keys():
-                    Exception("Duplicate access (id:{})".format(request_id))
+                    raise Exception("Duplicate slave access (id: %d)" % request_id)
 
-                print("Notification to acc: {}".format(access_id))
+                print("Notification to slave access (id: %d)" % access_id)
                 notification = I2cSlaveAccess(msg.slave_status.access_id, msg.slave_status.status_code,
                                               msg.slave_status.write_addr, msg.slave_status.mem_data,
                                               msg.slave_status.read_addr, msg.slave_status.read_size)

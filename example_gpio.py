@@ -10,7 +10,7 @@ from msg import tiny_frame
 from helper import get_com_port, print_error
 
 
-SET_LOOPS = 16 * 10
+SET_LOOPS = 16 * 1000
 SET_COUNTER = 0
 OUTPUT_PATTERN = 1
 REVERSED = False

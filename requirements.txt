@@ -2,3 +2,4 @@ pyserial
 scons
 protobuf
 grpcio-tools
+pytest

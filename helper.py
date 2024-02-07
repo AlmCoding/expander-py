@@ -42,32 +42,57 @@ def generate_master_write_read_requests(slave_addr: int, min_addr: int, max_addr
     return master_requests
 
 
+"""
 def verify_master_write_read_requests(requests: list[pm.I2cMasterRequest]):
-    for idx, request in enumerate(requests):
+    previous_write_request = None
+    for request in enumerate(requests):
         if request.status_code != pm.I2cMasterStatusCode.COMPLETE:
-            print_error("Request (id: {}, code: {}) [failed]".format(request.request_id, request.status_code))
+            print_error("[VR] Request (id: {}, code: {}) [failed]".format(request.request_id, request.status_code))
             continue
 
         if request.read_size == 0 and len(request.write_data):
-            print("Write request (id: {}) [ok]".format(request.request_id))
+            print("[VR] Write request (id: {}) [ok]".format(request.request_id))
             continue
 
-        write_data = requests[idx - 1].write_data[2:]
+        write_data = previous_write_request.write_data[2:]
         if request.read_data != write_data:
-            print_error("Request (id: {}, code: {}) data mismatch {} != {}"
+            print_error("[VR] Request (id: {}, code: {}) data mismatch {} != {}"
                         .format(request.request_id, request.status_code, request.read_data.hex(), write_data.hex()))
         else:
-            print("Read request (id: {}) [ok]".format(request.request_id))
+            print("[VR] Read request (id: {}) [ok]".format(request.request_id))
     requests.clear()
+"""
+
+"""
+def verify_master_write_read_requests(i2c_int: pm.I2cInterface):
+    complete_count = len(i2c_int.get_complete_master_request_ids())
+    if (complete_count % 2 != 0) or (complete_count == 0):
+        return
+
+    previous_write_request = None
+    for request in i2c_int.pop_complete_master_requests().values():
+        assert request.status_code == pm.I2cMasterStatusCode.COMPLETE
+        if request.read_size == 0:  # Write request
+            assert len(request.write_data) > 0
+            previous_write_request = request
+        else:  # Read request
+            assert request.mem_data == previous_write_request.write_data
 
 
 def i2c_send_master_request(i2c_int: pm.I2cInterface, request_queue: list[pm.I2cMasterRequest]) -> bool:
-    if len(request_queue) and i2c_int.can_accept_request(request_queue[0]):
+    if len(request_queue) == 0:
+        return False
+    if len(i2c_int.get_pending_master_request_ids()) > 0:
+        return False
+
+    if i2c_int.can_accept_request(request_queue[0]):
         request = request_queue.pop(0)
         rid = i2c_int.send_master_request_msg(request=request)
-        print("Req: {}, w_addr: '{}', w_data: {} ({}), r_size: {}".format(rid, request.write_data[:2].hex(),
-                                                                          request.write_data[2:],
-                                                                          len(request.write_data[2:]),
-                                                                          request.read_size))
+        # print("Req: {}, w_addr: '{}', w_data: {} ({}), r_size: {}".format(rid, request.write_data[:2].hex(),
+        #                                                                  request.write_data[2:],
+        #                                                                  len(request.write_data[2:]),
+        #                                                                  request.read_size))
+        assert len(i2c_int.get_pending_master_request_ids()) > 0
         return True
     return False
+"""

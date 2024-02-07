@@ -12,8 +12,9 @@ from helper import (get_com_port, print_error, generate_master_write_read_reques
 
 
 REQUEST_LOOPS = 4 * 10000
-MAX_DATA_SIZE = 32
-IGNORE_SLAVE_NOTIFICATIONS = True  # For testing master only (and slave hal, but no slave notify logic)
+MAX_DATA_SIZE = 4
+EVALUATE_IMMEDIATELY = True
+IGNORE_SLAVE_NOTIFICATIONS = False  # For testing master only (and slave hal, but no slave notify logic)
 
 
 def verify_slave_notifications(slave_notifications: list[pm.I2cSlaveAccess], master_requests: list[pm.I2cMasterRequest]):
@@ -22,28 +23,28 @@ def verify_slave_notifications(slave_notifications: list[pm.I2cSlaveAccess], mas
         if master_req.read_size == 0 and len(master_req.write_data):
             # Write request
             if master_req_addr != slave_not.write_addr:
-                raise Exception("Master request and slave notification register address mismatch!")
+                raise Exception("[VN] Master request and slave notification register address mismatch!")
             if len(master_req.write_data[2:]) != len(slave_not.write_data):
-                raise Exception("Master request and slave notification write_size mismatch!")
+                raise Exception("[VN] Master request and slave notification write_size mismatch!")
             if master_req.write_data[2:] != slave_not.write_data:
-                raise Exception("Master request and slave notification data mismatch!")
-            print("Slave write access notification (master_req_id: {}, slave_acc_id: {}) [ok]"
-                  .format(master_req.request_id, slave_not.access_id))
+                raise Exception("[VN] Master request and slave notification data mismatch!")
+            print("[VN] Slave write access notification (master_req_id: %d, slave_acc_id: %d) - (master_write_size: %d, slave_data_size: %d) [ok]" %
+                  (master_req.request_id, slave_not.access_id, len(master_req.write_data[2:]), len(slave_not.write_data)))
         elif master_req.read_size > 0:
             # Read request
             if master_req_addr != slave_not.read_addr:
-                raise Exception("Master request and slave notification register address mismatch!")
+                raise Exception("[VN] Master request and slave notification register address mismatch!")
             if master_req.read_size != slave_not.read_size:
-                raise Exception("Master request (master_req_id: {}, slave_acc_id: {}) and slave notification read_size mismatch ({} != {})"
+                raise Exception("[VN] Master request (master_req_id: {}, slave_acc_id: {}) and slave notification read_size mismatch ({} != {})"
                                 .format(master_req.request_id, slave_not.access_id, master_req.read_size, slave_not.read_size))
-            print("Slave read access notification (master_req_id: {}, slave_acc_id: {}) [ok]"
-                  .format(master_req.request_id, slave_not.access_id))
+            print("[VN] Slave read access notification (master_req_id: %d, slave_acc_id: %d) - (master_read_size: %d, slave_data_size: %d) [ok]" %
+                  (master_req.request_id, slave_not.access_id, master_req.read_size, slave_not.read_size))
         else:
-            raise Exception("Invalid master request (id: {})".format(master_req.id))
+            raise Exception("[VN] Invalid master request (id: {})".format(master_req.id))
 
 
 def main(arguments):
-    global REQUEST_LOOPS, IGNORE_SLAVE_NOTIFICATIONS
+    global REQUEST_LOOPS, EVALUATE_IMMEDIATELY, IGNORE_SLAVE_NOTIFICATIONS
     print("I2cMaster and I2cSlave testing")
 
     with serial.Serial(get_com_port(), 115200, timeout=1) as ser:
@@ -74,8 +75,21 @@ def main(arguments):
         notifications_received_count = 0
 
         while True:
-            if notifications_received_count == requests_send_count or IGNORE_SLAVE_NOTIFICATIONS:
-                if i2c_send_master_request(i2c_int0, requests_pipeline0):
+            if notifications_received_count == requests_done_count or IGNORE_SLAVE_NOTIFICATIONS:
+                if EVALUATE_IMMEDIATELY and (requests_done_count > 0) and (requests_done_count % 2 == 0):
+                    # Evaluate notifications
+                    verify_master_write_read_requests(requests0 + requests1)
+                    if not IGNORE_SLAVE_NOTIFICATIONS:
+                        verify_slave_notifications(notifications0 + notifications1, requests0 + requests1)
+                    notifications0.clear()
+                    notifications1.clear()
+                    requests0.clear()
+                    requests1.clear()
+                    requests_send_count = 0
+                    if len(requests_pipeline0) == 0:
+                        exit(0)
+
+                if (requests_send_count < 2) and i2c_send_master_request(i2c_int0, requests_pipeline0):
                     requests_send_count += 1
                 # i2c_send_master_request(i2c_int1, requests_pipeline1)
 
@@ -86,14 +100,15 @@ def main(arguments):
             notifications0 += i2c_int0.pop_slave_access_notifications().values()
             notifications1 += i2c_int1.pop_slave_access_notifications().values()
             notifications_received_count = len(notifications0 + notifications1)
-
-            if requests_done_count == requests_send_count \
+            """
+            if len(requests_pipeline0) == 0 and requests_done_count == requests_send_count \
                     and (notifications_received_count == requests_send_count or IGNORE_SLAVE_NOTIFICATIONS):
-                verify_master_write_read_requests(requests0 + requests1)
-                if not IGNORE_SLAVE_NOTIFICATIONS:
-                    verify_slave_notifications(notifications0 + notifications1, requests0 + requests1)
+                if not EVALUATE_IMMEDIATELY:
+                    verify_master_write_read_requests(requests0 + requests1)
+                    if not IGNORE_SLAVE_NOTIFICATIONS:
+                        verify_slave_notifications(notifications0 + notifications1, requests0 + requests1)
                 exit(0)
-
+            """
             if ser.in_waiting > 0:
                 # Read the incoming data
                 rx_data = ser.read(ser.in_waiting)

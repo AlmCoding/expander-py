@@ -185,6 +185,10 @@ class I2cInterface:
         return [request.request_id for rid, request in self.slave_requests.items()
                 if request.status_code == I2cSlaveStatusCode.PENDING]
 
+    def get_complete_slave_request_ids(self) -> list[int]:
+        return [request.request_id for rid, request in self.slave_requests.items()
+                if request.status_code != I2cSlaveStatusCode.PENDING]
+
     def pop_complete_slave_requests(self) -> dict[I2cSlaveRequest]:
         complete_requests = {request.request_id: request for rid, request in self.slave_requests.items()
                              if request.status_code != I2cSlaveStatusCode.PENDING}
@@ -328,7 +332,10 @@ class I2cInterface:
                 if access_id in self.slave_access_notifications.keys():
                     raise Exception("Duplicate slave access (id: %d)" % request_id)
 
-                print("Notification to slave access (id: %d)" % access_id)
+                print("Notification to slave access (id: %d, write_addr: 0x%02x, write_data: %s, read_addr: 0x%02x, read_size: %d)"
+                      % (access_id,
+                         msg.slave_status.write_addr, msg.slave_status.mem_data,
+                         msg.slave_status.read_addr, msg.slave_status.read_size))
                 notification = I2cSlaveAccess(msg.slave_status.access_id, msg.slave_status.status_code,
                                               msg.slave_status.write_addr, msg.slave_status.mem_data,
                                               msg.slave_status.read_addr, msg.slave_status.read_size)

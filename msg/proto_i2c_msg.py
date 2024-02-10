@@ -103,7 +103,7 @@ class I2cInterface:
 
     def __del__(self):
         global I2C_INSTANCE
-        if I2C_INSTANCE[self.i2c_id] is self:
+        if I2C_INSTANCE and I2C_INSTANCE[self.i2c_id] is self:
             I2C_INSTANCE[self.i2c_id] = None
 
     def can_accept_request(self, request) -> bool:
@@ -196,9 +196,17 @@ class I2cInterface:
             del self.slave_requests[rid]
         return complete_requests
 
-    def pop_slave_access_notifications(self) -> dict[I2cSlaveAccess]:
-        notifications = self.slave_access_notifications.copy()
-        self.slave_access_notifications.clear()
+    def get_slave_access_notifications(self) -> dict[I2cSlaveAccess]:
+        return self.slave_access_notifications.copy()
+
+    def pop_slave_access_notifications(self, count=-1) -> dict[I2cSlaveAccess]:
+        notifications = {}
+        if count > 0:
+            keys = list(self.slave_access_notifications.keys())[:count]
+            notifications = {key: self.slave_access_notifications.pop(key) for key in keys}
+        else:
+            notifications = self.slave_access_notifications.copy()
+            self.slave_access_notifications.clear()
         return notifications
 
     def send_config_msg(self) -> None:

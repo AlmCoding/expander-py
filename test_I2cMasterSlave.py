@@ -18,7 +18,7 @@ def serial_port():
 
 
 class TestI2cMasterSlave:
-    REQUEST_COUNT = 4 * 10
+    REQUEST_COUNT = 4 * 1000
     DATA_SIZE_MIN = 1
     DATA_SIZE_MAX = 64 - tiny_frame.TF_FRAME_OVERHEAD_SIZE - 24
 

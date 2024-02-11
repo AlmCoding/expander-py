@@ -52,10 +52,9 @@ def i2c_send_master_request(i2c_int: pm.I2cInterface, request_queue: list[pm.I2c
     if len(request_queue) and i2c_int.can_accept_request(request_queue[0]):
         request = request_queue.pop(0)
         rid = i2c_int.send_master_request_msg(request=request)
-        # print("Req: {}, w_addr: '{}', w_data: {} ({}), r_size: {}".format(rid, request.write_data[:2].hex(),
-        #                                                                  request.write_data[2:],
-        #                                                                  len(request.write_data[2:]),
-        #                                                                  request.read_size))
+        print("Send master reqeust (id: {}, w_addr: '{}', w_data: {} ({}), r_size: {})"
+              .format(rid, request.write_data[:2].hex(),
+                      request.write_data[2:], len(request.write_data[2:]), request.read_size))
         assert len(i2c_int.get_pending_master_request_ids()) > 0
 
 

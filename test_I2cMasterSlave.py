@@ -18,7 +18,7 @@ def serial_port():
 
 
 class TestI2cMasterSlave:
-    REQUEST_COUNT = 4 * 10000
+    REQUEST_COUNT = 4 * 1000
     DATA_SIZE_MIN = 1
     DATA_SIZE_MAX = 64 - tiny_frame.TF_FRAME_OVERHEAD_SIZE - 24
 
@@ -84,16 +84,15 @@ class TestI2cMasterSlave:
                                                                  max_addr=pm.I2C_SLAVE_BUFFER_SPACE - 1,
                                                                  max_size=TestI2cMasterSlave.DATA_SIZE_MAX,
                                                                  count=TestI2cMasterSlave.REQUEST_COUNT // 4)
-        # requests_pipeline1 = generate_master_write_read_requests(slave_addr=TestI2cMasterSlave.I2C0_SLAVE_ADDR,
-        #                                                         min_addr=0,
-        #                                                         max_addr=pm.I2C_SLAVE_BUFFER_SPACE - 1,
-        #                                                         max_size=TestI2cMasterSlave.DATA_SIZE_MAX,
-        #                                                         count=TestI2cMasterSlave.REQUEST_COUNT // 4)
-        requests_pipeline1 = []
-
+        requests_pipeline1 = generate_master_write_read_requests(slave_addr=TestI2cMasterSlave.I2C0_SLAVE_ADDR,
+                                                                 min_addr=0,
+                                                                 max_addr=pm.I2C_SLAVE_BUFFER_SPACE - 1,
+                                                                 max_size=TestI2cMasterSlave.DATA_SIZE_MAX,
+                                                                 count=TestI2cMasterSlave.REQUEST_COUNT // 4)
+        # requests_pipeline1 = []
         while True:
             i2c_send_master_request(i2c_int0, requests_pipeline0)
-            # i2c_send_master_request(i2c_int1, requests_pipeline1)
+            i2c_send_master_request(i2c_int1, requests_pipeline1)
 
             if serial_port.in_waiting > 0:
                 # Read the incoming data

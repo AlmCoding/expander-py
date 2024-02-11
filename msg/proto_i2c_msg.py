@@ -121,9 +121,9 @@ class I2cInterface:
             elif self.master_buffer_space2 >= (len(request.write_data) + request.read_size):
                 accept = True
 
-            if accept:
-                print("Accept master request ok (sp1: %d, sp2: %d)" %
-                      (self.master_buffer_space1, self.master_buffer_space2))
+            # if accept:
+            #    print("Accept master request ok (sp1: %d, sp2: %d)" %
+            #          (self.master_buffer_space1, self.master_buffer_space2))
 
         elif isinstance(request, I2cSlaveRequest) and self.slave_queue_space > 0:
             accept = True
@@ -154,8 +154,8 @@ class I2cInterface:
             elif self.master_buffer_space2 >= (bigger_section + smaller_section):
                 self.master_buffer_space2 -= (bigger_section + smaller_section)
 
-            print("Update space after send master request (id: %d, sp1: %d, sp2: %d)" %
-                  (request.request_id, self.master_buffer_space1, self.master_buffer_space2))
+            # print("Update space after send master request (id: %d, sp1: %d, sp2: %d)" %
+            #      (request.request_id, self.master_buffer_space1, self.master_buffer_space2))
 
         elif isinstance(request, I2cSlaveRequest):
             self.slave_queue_space -= 1

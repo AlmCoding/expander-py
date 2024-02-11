@@ -73,5 +73,6 @@ def verify_master_write_read_requests(i2c_int: pm.I2cInterface) -> list[pm.I2cMa
             assert len(request.write_data) > 0
             previous_write_request = request
         else:  # Read request
+            assert len(request.write_data) == 2
             assert request.read_data == previous_write_request.write_data[2:]
     return complete_requests

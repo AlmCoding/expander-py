@@ -51,6 +51,7 @@ class TestI2cMaster:
                                                                  max_addr=pm.I2C_SLAVE_BUFFER_SPACE - 1,
                                                                  max_size=TestI2cMaster.DATA_SIZE_MAX,
                                                                  count=TestI2cMaster.REQUEST_COUNT // 4)
+        # requests_pipeline1 = []
         while True:
             i2c_send_master_request(i2c_int0, requests_pipeline0)
             i2c_send_master_request(i2c_int1, requests_pipeline1)

@@ -4,13 +4,13 @@ from enum import Enum
 
 class TfMsgType(Enum):
     TYPE_ECHO = 0x00
-    TYPE_UART = 0x01
+    TYPE_CTRL = 0x01
     TYPE_I2C = 0x02
     TYPE_SPI = 0x03
     TYPE_CAN = 0x04
     TYPE_GPIO = 0x05
     TYPE_PWM = 0x06
-    TYPE_ADC = 0x07
+    TYPE_UART = 0x07
 
 
 TF_INSTANCE = TF.TinyFrame()

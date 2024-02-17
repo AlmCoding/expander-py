@@ -306,12 +306,12 @@ class I2cInterface:
 
             request_id = msg.master_status.request_id
             if request_id not in self.master_requests.keys():
-                raise Exception("Unknown master request (id: %d)" % request_id)
+                raise Exception("Unknown master(%d) request (id: %d)" % (self.i2c_id.value, request_id))
             if update_space:
-                print("Response to master request (id: %d) | Update (sp1: %d, sp2: %d)" %
-                      (request_id, self.master_buffer_space1, self.master_buffer_space2))
+                print("Response to master(%d) request (id: %d) | Update (sp1: %d, sp2: %d)" %
+                      (self.i2c_id.value, request_id, self.master_buffer_space1, self.master_buffer_space2))
             else:
-                print("Response to master request (id: %d)" % request_id)
+                print("Response to master(%d) request (id: %d)" % (self.i2c_id.value, request_id))
 
             self.master_requests[request_id].status_code = I2cMasterStatusCode(msg.master_status.status_code)
             self.master_requests[request_id].read_data = msg.master_status.read_data
@@ -327,8 +327,8 @@ class I2cInterface:
             access_id = msg.slave_status.access_id
             if request_id > 0:
                 if request_id not in self.slave_requests.keys():
-                    raise Exception("Unknown slave request (id: %d)" % request_id)
-                print("Response to slave request (id: %d)" % request_id)
+                    raise Exception("Unknown slave(%d) request (id: %d)" % (self.i2c_id.value, request_id))
+                print("Response to slave(%d) request (id: %d)" % (self.i2c_id.value, request_id))
 
                 self.slave_requests[request_id].status_code = I2cSlaveStatusCode(msg.slave_status.status_code)
                 self.slave_requests[request_id].mem_data = msg.slave_status.mem_data
@@ -338,16 +338,18 @@ class I2cInterface:
 
             elif access_id > 0:
                 if access_id in self.slave_access_notifications.keys():
-                    raise Exception("Duplicate slave access (id: %d)" % request_id)
+                    raise Exception("Duplicate slave(%d) access (id: %d)" % (self.i2c_id.value, request_id))
 
-                print("Notification to slave access (id: %d, write_addr: 0x%02x, write_data: %s, read_addr: 0x%02x, read_size: %d)"
-                      % (access_id,
-                         msg.slave_status.write_addr, msg.slave_status.mem_data,
-                         msg.slave_status.read_addr, msg.slave_status.read_size))
                 notification = I2cSlaveAccess(msg.slave_status.access_id, msg.slave_status.status_code,
                                               msg.slave_status.write_addr, msg.slave_status.mem_data,
                                               msg.slave_status.read_addr, msg.slave_status.read_size)
                 self.slave_access_notifications[notification.access_id] = notification
+
+                print("Notification slave(%d) access (id: %d, w_addr: 0x%02x, w_data: %s (%d), "
+                      "r_addr: 0x%02x, r_size: %d)"
+                      % (self.i2c_id.value, access_id,
+                         notification.write_addr, notification.write_data, len(notification.write_data),
+                         notification.read_addr, notification.read_size))
 
 
 def receive_i2c_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:

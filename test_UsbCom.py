@@ -5,7 +5,9 @@
 
 import pytest
 import serial
+import time
 from msg import tiny_frame
+from msg import proto_ctrl_msg as ctrl_pm
 from helper import get_com_port, generate_ascii_data
 
 

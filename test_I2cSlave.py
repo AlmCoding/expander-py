@@ -3,18 +3,10 @@
 """ Testing I2c slave write and read memory updates (no physical I2c communication involved)
 """
 
-import pytest
-import serial
 import random
 from msg import tiny_frame
 from msg import proto_i2c_msg as pm
-from helper import get_com_port, generate_ascii_data
-
-
-@pytest.fixture()
-def serial_port():
-    with serial.Serial(get_com_port(), 115200, timeout=1) as ser:
-        yield ser
+from helper import serial_port, generate_ascii_data
 
 
 class TestI2cSlave:

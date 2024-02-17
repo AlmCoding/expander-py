@@ -1,8 +1,12 @@
 import sys
+import time
 import string
 import random
+import pytest
 import serial.tools.list_ports
+from msg import tiny_frame
 from msg import proto_i2c_msg as pm
+from msg import proto_ctrl_msg as ctrl_pm
 
 
 def print_error(*args, **kwargs):
@@ -16,6 +20,17 @@ def get_com_port() -> str:
             if "Serial Device" in desc:
                 return port
     raise Exception("No Serial Port found!")
+
+
+@pytest.fixture()
+def serial_port():
+    with serial.Serial(get_com_port(), 115200, timeout=1) as ser:
+        tiny_frame.tf_init(ser.write)
+        ctrl_pm.CtrlInterface.send_system_reset_msg()
+        time.sleep(2)
+
+    with serial.Serial(get_com_port(), 115200, timeout=1) as ser:
+        yield ser
 
 
 def generate_ascii_data(min_size: int, max_size: int) -> bytes:

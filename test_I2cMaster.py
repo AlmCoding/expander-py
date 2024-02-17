@@ -3,18 +3,10 @@
 """ Testing I2c master write/read
 """
 
-import pytest
-import serial
 from msg import tiny_frame
 from msg import proto_i2c_msg as pm
-from helper import (get_com_port, generate_master_write_read_requests,
+from helper import (serial_port, generate_master_write_read_requests,
                     i2c_send_master_request, verify_master_write_read_requests)
-
-
-@pytest.fixture()
-def serial_port():
-    with serial.Serial(get_com_port(), 115200, timeout=1) as ser:
-        yield ser
 
 
 class TestI2cMaster:

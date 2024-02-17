@@ -4,20 +4,13 @@
 """
 
 import pytest
-import serial
 from msg import tiny_frame
 from msg import proto_gpio_msg as pm
-from helper import get_com_port
-
-
-@pytest.fixture()
-def serial_port():
-    with serial.Serial(get_com_port(), 115200, timeout=1) as ser:
-        yield ser
+from helper import serial_port
 
 
 class TestGpio:
-    REQUEST_COUNT = 1000
+    REQUEST_COUNT = 10000
 
     def setup_class(self):
         self.reverse = False

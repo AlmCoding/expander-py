@@ -64,10 +64,14 @@ class TestI2cSlave:
 
     def test_i2c_slave_write_read(self, serial_port):
         tf = tiny_frame.tf_init(serial_port.write)
-        i2c_int0 = pm.I2cInterface(i2c_id=pm.I2cId.I2C0, i2c_addr=TestI2cSlave.I2C0_SLAVE_ADDR,
-                                   i2c_clock=TestI2cSlave.I2C_CLOCK_FREQ, i2c_pullups=True)
-        i2c_int1 = pm.I2cInterface(i2c_id=pm.I2cId.I2C1, i2c_addr=TestI2cSlave.I2C1_SLAVE_ADDR,
-                                   i2c_clock=TestI2cSlave.I2C_CLOCK_FREQ, i2c_pullups=False)
+        cfg0 = pm.I2cConfig(clock_freq=TestI2cSlave.I2C_CLOCK_FREQ, slave_addr=TestI2cSlave.I2C0_SLAVE_ADDR,
+                            slave_addr_width=pm.AddressWidth.Bits7, mem_addr_width=pm.AddressWidth.Bits16,
+                            pullups_enabled=True)
+        cfg1 = pm.I2cConfig(clock_freq=TestI2cSlave.I2C_CLOCK_FREQ, slave_addr=TestI2cSlave.I2C1_SLAVE_ADDR,
+                            slave_addr_width=pm.AddressWidth.Bits7, mem_addr_width=pm.AddressWidth.Bits16,
+                            pullups_enabled=True)
+        i2c_int0 = pm.I2cInterface(i2c_id=pm.I2cId.I2C0, config=cfg0)
+        i2c_int1 = pm.I2cInterface(i2c_id=pm.I2cId.I2C1, config=cfg1)
 
         requests_pipeline0 = TestI2cSlave.generate_write_read_requests(TestI2cSlave.REQUEST_COUNT // 4)
         requests_pipeline1 = TestI2cSlave.generate_write_read_requests(TestI2cSlave.REQUEST_COUNT // 4)

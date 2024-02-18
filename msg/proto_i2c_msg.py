@@ -14,6 +14,13 @@ class I2cId(Enum):
     I2C1 = 1
 
 
+class AddressWidth(Enum):
+    Bits7 = 0
+    Bits8 = 1
+    Bits12 = 2
+    Bits16 = 3
+
+
 class I2cMasterStatusCode(Enum):
     NOT_INIT = 0
     NO_SPACE = 1
@@ -38,6 +45,16 @@ I2C_INSTANCE = {
     I2cId.I2C0: None,
     I2cId.I2C1: None
 }
+
+
+class I2cConfig:
+    def __init__(self, clock_freq: int, slave_addr: int, slave_addr_width: AddressWidth,
+                 mem_addr_width: AddressWidth, pullups_enabled: bool):
+        self.clock_freq = clock_freq
+        self.slave_addr = slave_addr
+        self.slave_addr_width = slave_addr_width
+        self.mem_addr_width = mem_addr_width
+        self.pullups_enabled = pullups_enabled
 
 
 class I2cMasterRequest:
@@ -77,11 +94,9 @@ class I2cSlaveAccess:
 
 
 class I2cInterface:
-    def __init__(self, i2c_id: I2cId, i2c_addr: int, i2c_clock: int, i2c_pullups: bool):
+    def __init__(self, i2c_id: I2cId, config: I2cConfig):
         self.i2c_id = i2c_id
-        self.i2c_addr = i2c_addr
-        self.i2c_clock = i2c_clock
-        self.i2c_pullups = i2c_pullups
+        self.config = config
         self.sequence_number = 0  # Proto message synchronization
         self.request_id_counter = 0
         self.sequence_id_counter = 0  # I2c request sequence counter
@@ -100,6 +115,8 @@ class I2cInterface:
 
         global I2C_INSTANCE
         I2C_INSTANCE[self.i2c_id] = self
+
+        self.send_config_msg(self.config)
 
     def __del__(self):
         global I2C_INSTANCE
@@ -209,14 +226,18 @@ class I2cInterface:
             self.slave_access_notifications.clear()
         return notifications
 
-    def send_config_msg(self) -> None:
+    def send_config_msg(self, config: I2cConfig) -> None:
         self.sequence_number += 1
+        self.config = config
 
         msg = i2c_pb2.I2cMsg()
         msg.i2c_id = self.i2c_idm
         msg.sequence_number = self.sequence_number
-        msg.cfg.clock_rate = self.i2c_clock
-        msg.cfg.pullups_enabled = self.i2c_pullups
+
+        msg.cfg.clock_freq = config.clock_freq
+        msg.cfg.slave_addr = i2c_pb2.AddressWidth.Bits7
+        msg.cfg.mem_addr_width = i2c_pb2.AddressWidth.Bits16
+        msg.cfg.pullups_enabled = config.pullups_enabled
 
         msg_bytes = msg.SerializeToString()
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_I2C.value, msg_bytes, 0)
@@ -234,7 +255,7 @@ class I2cInterface:
 
         return ids
 
-    def send_master_request_msg(self, request) -> int:
+    def send_master_request_msg(self, request: I2cMasterRequest) -> int:
         self.sequence_number += 1
         self.request_id_counter += 1
 
@@ -267,7 +288,7 @@ class I2cInterface:
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_I2C.value, msg_bytes, 0)
         return request.request_id
 
-    def send_slave_request_msg(self, request) -> int:
+    def send_slave_request_msg(self, request: I2cSlaveRequest) -> int:
         self.sequence_number += 1
         self.request_id_counter += 1
 

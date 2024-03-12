@@ -4,6 +4,8 @@
 """
 
 import random
+import time
+
 from msg import tiny_frame
 from msg import proto_i2c_msg as pm
 from helper import serial_port, generate_ascii_data
@@ -72,6 +74,7 @@ class TestI2cSlave:
                             pullups_enabled=True)
         i2c_int0 = pm.I2cInterface(i2c_id=pm.I2cId.I2C0, config=cfg0)
         i2c_int1 = pm.I2cInterface(i2c_id=pm.I2cId.I2C1, config=cfg1)
+        time.sleep(1)
 
         requests_pipeline0 = TestI2cSlave.generate_write_read_requests(TestI2cSlave.REQUEST_COUNT // 4)
         requests_pipeline1 = TestI2cSlave.generate_write_read_requests(TestI2cSlave.REQUEST_COUNT // 4)

@@ -3,6 +3,7 @@
 """ Testing I2c master write/read and slave notifications
 """
 
+import time
 import pytest
 from msg import tiny_frame
 from msg import proto_i2c_msg as pm
@@ -94,10 +95,15 @@ class TestI2cMasterSlave:
     def test_i2c_master_slave_write_read(self, serial_port):
         # Test master and slave simultaneously
         tf = tiny_frame.tf_init(serial_port.write)
-        i2c_int0 = pm.I2cInterface(i2c_id=pm.I2cId.I2C0, i2c_addr=TestI2cMasterSlave.I2C0_SLAVE_ADDR,
-                                   i2c_clock=TestI2cMasterSlave.I2C_CLOCK_FREQ, i2c_pullups=True)
-        i2c_int1 = pm.I2cInterface(i2c_id=pm.I2cId.I2C1, i2c_addr=TestI2cMasterSlave.I2C1_SLAVE_ADDR,
-                                   i2c_clock=TestI2cMasterSlave.I2C_CLOCK_FREQ, i2c_pullups=False)
+        cfg0 = pm.I2cConfig(clock_freq=TestI2cMasterSlave.I2C_CLOCK_FREQ, slave_addr=TestI2cMasterSlave.I2C0_SLAVE_ADDR,
+                            slave_addr_width=pm.AddressWidth.Bits7, mem_addr_width=pm.AddressWidth.Bits16,
+                            pullups_enabled=True)
+        cfg1 = pm.I2cConfig(clock_freq=TestI2cMasterSlave.I2C_CLOCK_FREQ, slave_addr=TestI2cMasterSlave.I2C1_SLAVE_ADDR,
+                            slave_addr_width=pm.AddressWidth.Bits7, mem_addr_width=pm.AddressWidth.Bits16,
+                            pullups_enabled=True)
+        i2c_int0 = pm.I2cInterface(i2c_id=pm.I2cId.I2C0, config=cfg0)
+        i2c_int1 = pm.I2cInterface(i2c_id=pm.I2cId.I2C1, config=cfg1)
+        time.sleep(1)
 
         requests_pipeline0 = generate_master_write_read_requests(slave_addr=TestI2cMasterSlave.I2C1_SLAVE_ADDR,
                                                                  min_addr=0,

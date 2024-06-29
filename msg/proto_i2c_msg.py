@@ -234,10 +234,11 @@ class I2cInterface:
         msg.i2c_id = self.i2c_idm
         msg.sequence_number = self.sequence_number
 
-        msg.cfg.clock_freq = config.clock_freq
-        msg.cfg.slave_addr = i2c_pb2.AddressWidth.Bits7
-        msg.cfg.mem_addr_width = i2c_pb2.AddressWidth.Bits16
-        msg.cfg.pullups_enabled = config.pullups_enabled
+        msg.config_request.request_id = 0
+        msg.config_request.clock_freq = config.clock_freq
+        msg.config_request.slave_addr = i2c_pb2.AddressWidth.Bits7
+        msg.config_request.mem_addr_width = i2c_pb2.AddressWidth.Bits16
+        msg.config_request.pullups_enabled = config.pullups_enabled
 
         msg_bytes = msg.SerializeToString()
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_I2C.value, msg_bytes, 0)

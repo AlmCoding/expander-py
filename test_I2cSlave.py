@@ -57,12 +57,12 @@ class TestI2cSlave:
 
         previous_write_request = None
         for request in i2c_int.pop_complete_slave_requests().values():
-            assert request.status_code == pm.I2cSlaveStatusCode.COMPLETE
+            assert request.status_code == pm.I2cStatusCode.SUCCESS
             if request.read_size == 0:  # Write request
                 assert len(request.write_data) > 0
                 previous_write_request = request
             else:  # Read request
-                assert request.mem_data == previous_write_request.write_data
+                assert request.read_data == previous_write_request.write_data
 
     def test_i2c_slave_write_read(self, serial_port):
         tf = tiny_frame.tf_init(serial_port.write)

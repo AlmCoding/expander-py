@@ -29,7 +29,7 @@ class TestI2cMasterSlave:
 
         if access_id_max1 > request_id_max0:
             pytest.fail("No corresponding master(0) request for slave(1) access notification (id: %d) found!"
-                        % (access_id_max1, ))
+                        % (access_id_max1,))
 
         if access_id_max0 > request_id_max1:
             pytest.fail("No corresponding master(1) request for slave(0) access notification (id: %d) found!"
@@ -40,8 +40,8 @@ class TestI2cMasterSlave:
         # This only holds true if slave notifications are always serviced before master request responses
         if len(i2c_int.get_slave_access_notifications()) < len(complete_master_requests):
             pytest.fail("More complete master(%d) requests (cnt: %d) than slave notifications (cnt: %d) detected!"
-                        % (i2c_int.i2c_id.value, len(i2c_int.get_slave_access_notifications()),
-                           len(complete_master_requests)))
+                        % (i2c_int.i2c_id.value, len(complete_master_requests),
+                           len(i2c_int.get_slave_access_notifications())))
         slave_notifications = i2c_int.pop_slave_access_notifications(len(complete_master_requests)).values()
         slave_id = i2c_int.i2c_id
         master_id = pm.I2cId.I2C0 if slave_id == pm.I2cId.I2C1 else pm.I2cId.I2C1
@@ -66,31 +66,33 @@ class TestI2cMasterSlave:
     @staticmethod
     def verify_slave_master_write_notification(master_id: int, master_req, slave_id: int, slave_not):
         master_req_addr = int.from_bytes(master_req.write_data[:2], byteorder='big')
-        if master_req_addr != slave_not.write_addr:
+        slave_not_addr = int.from_bytes(slave_not.write_data[:2], byteorder='big')
+        if master_req_addr != slave_not_addr:
             pytest.fail("Master(%d) request (id: %d, write_addr: %d) and "
                         "slave(%d) indication (id: %d, write_addr: %d) write_addr mismatch!"
                         % (master_id, master_req.request_id, master_req_addr,
-                           slave_id, slave_not.access_id, slave_not.write_addr))
+                           slave_id, slave_not.access_id, slave_not_addr))
 
-        if master_req.write_data[2:] != slave_not.write_data:
+        if master_req.write_data != slave_not.write_data:
             pytest.fail("Master(%d) request (id: %d) and slave(%d) indication (id: %d) write_data (%s != %s) mismatch!"
                         % (master_id, master_req.request_id, slave_id,
-                           slave_not.access_id, master_req.write_data[2:], slave_not.write_addr))
+                           slave_not.access_id, master_req.write_data[2:], slave_not_addr))
 
     @staticmethod
     def verify_slave_master_read_notification(master_id: int, master_req, slave_id: int, slave_not):
         master_req_addr = int.from_bytes(master_req.write_data[:2], byteorder='big')
-        if master_req_addr != slave_not.read_addr:
+        slave_not_addr = int.from_bytes(slave_not.write_data[:2], byteorder='big')
+        if master_req_addr != slave_not_addr:
             pytest.fail("Master(%d) request (id: %d, read_addr: %d) and "
                         "slave(%d) indication (id: %d, read_addr: %d) read_addr mismatch!"
                         % (master_id, master_req.request_id, master_req_addr,
-                           slave_id, slave_not.access_id, slave_not.read_addr))
+                           slave_id, slave_not.access_id, slave_not_addr))
 
-        if master_req.read_size != slave_not.read_size:
+        if master_req.read_size != len(slave_not.read_data):
             pytest.fail("Master(%d) request (id: %d, read_size: %d) and "
                         "slave(%d) indication (id: %d, read_size: %d) read_size mismatch!"
                         % (master_id, master_req.request_id, master_req.read_size,
-                           slave_id, slave_not.access_id, slave_not.read_size))
+                           slave_id, slave_not.access_id, len(slave_not.read_data)))
 
     def test_i2c_master_slave_write_read(self, serial_port):
         # Test master and slave simultaneously

@@ -81,7 +81,10 @@ def verify_master_write_read_requests(i2c_int: pm.I2cInterface) -> list[pm.I2cMa
     previous_write_request = None
     complete_requests = i2c_int.pop_complete_master_requests().values()
     for request in complete_requests:
-        assert request.status_code == pm.I2cMasterStatusCode.COMPLETE
+        if request.status_code != pm.I2cStatusCode.SUCCESS:
+            print("Master request (id: {}) failed with status code: {}"
+                  .format(request.request_id, request.status_code))
+        assert request.status_code == pm.I2cStatusCode.SUCCESS
         assert request.request_id > 0
         if request.read_size == 0:  # Write request
             assert len(request.write_data) > 0

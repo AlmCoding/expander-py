@@ -13,7 +13,7 @@ class CtrlInterface:
 
         msg = ctrl_pb2.CtrlMsg()
         msg.sequence_number = CtrlInterface.SequenceNumber
-        msg.system_reset = True
+        msg.ctrl_request.reset_system = True
 
         msg_bytes = msg.SerializeToString()
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_CTRL.value, msg_bytes, 0)

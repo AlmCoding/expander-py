@@ -4,7 +4,7 @@ import msg.tiny_frame as tf
 
 
 I2C_MASTER_QUEUE_SPACE = 4
-I2C_MASTER_BUFFER_SPACE = 64
+I2C_MASTER_BUFFER_SPACE = 512
 I2C_SLAVE_QUEUE_SPACE = 4
 I2C_SLAVE_BUFFER_SPACE = 512
 
@@ -221,7 +221,8 @@ class I2cInterface:
 
         msg.config_request.request_id = 0
         msg.config_request.clock_freq = config.clock_freq
-        msg.config_request.slave_addr = i2c_pb2.AddressWidth.Bits7
+        msg.config_request.slave_addr = config.slave_addr
+        msg.config_request.slave_addr_width = i2c_pb2.AddressWidth.Bits7
         msg.config_request.mem_addr_width = i2c_pb2.AddressWidth.Bits16
         msg.config_request.pullups_enabled = config.pullups_enabled
 

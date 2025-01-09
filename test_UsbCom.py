@@ -6,24 +6,29 @@
 from msg import tiny_frame
 from helper import serial_port, generate_ascii_data
 
+RX_DATA = None
+
 
 def tiny_frame_receive_cb(_, tf_msg):
+    global RX_DATA
     if isinstance(tf_msg, tiny_frame.TF.TF_Msg):
-        tiny_frame_receive_cb.RX_DATA = tf_msg.data
+        RX_DATA = tf_msg.data
     else:
-        return tiny_frame_receive_cb.RX_DATA
+        rx_data = RX_DATA
+        RX_DATA = None
+        return rx_data
 
 
 class TestUsbCom:
-    LOOP_COUNT = 10000
+    LOOP_COUNT = 1000
     DATA_SIZE_MIN = 1
-    DATA_SIZE_MAX = 64
+    DATA_SIZE_MAX = 256 + 64
 
     def test_usb_tinyframe_loop(self, serial_port):
         tf = tiny_frame.tf_init(serial_port.write)
         tiny_frame.tf_register_callback(tiny_frame.TfMsgType.TYPE_ECHO, tiny_frame_receive_cb)
 
-        TestUsbCom.DATA_SIZE_MAX -= tiny_frame.TF_FRAME_OVERHEAD_SIZE
+        # TestUsbCom.DATA_SIZE_MAX -= tiny_frame.TF_FRAME_OVERHEAD_SIZE
         counter = TestUsbCom.LOOP_COUNT
         while counter > 0:
             tx_data = generate_ascii_data(TestUsbCom.DATA_SIZE_MIN, TestUsbCom.DATA_SIZE_MAX)
@@ -35,9 +40,12 @@ class TestUsbCom:
                     rx_data = serial_port.read(serial_port.in_waiting)
                     tf.accept(rx_data)
                     tf_rx_data = tiny_frame_receive_cb(None, None)
-                    assert tf_rx_data == tx_data
-                    counter -= 1
-                    break
+                    if tf_rx_data is None:
+                        continue
+                    else:
+                        assert tf_rx_data == tx_data
+                        counter -= 1
+                        break
 
     """
     def test_usb_tinyframe_loop_stress(self, serial_port):

@@ -39,16 +39,16 @@ def generate_ascii_data(min_size: int, max_size: int) -> bytes:
     return tx_data.encode("utf-8")
 
 
-def generate_master_write_read_requests(slave_addr: int, min_addr: int, max_addr: int,
+def generate_master_write_read_requests(slave_addr: int, min_addr: int, max_addr: int, min_size: int,
                                         max_size: int, count: int) -> list[pm.I2cMasterRequest]:
     master_requests = []
     for _ in range(count):
-        mem_addr = random.randint(min_addr, max_addr)
-        max_data_size = min(max_addr - mem_addr + 1, max_size)
-        assert max_data_size >= 1
-        assert mem_addr + max_data_size <= max_addr + 1
-
-        data_bytes = generate_ascii_data(1, max_data_size)
+        max_size -= 2  # Subtract 2 bytes for address
+        min_size = min(min_size, max_size)
+        random_size = random.randint(min_size, max_size)
+        mem_addr = random.randint(min_addr, max_addr - random_size + 1)
+       
+        data_bytes = generate_ascii_data(random_size, random_size)
         addr_bytes = mem_addr.to_bytes(2, 'big')
         tx_bytes = bytes(bytearray(addr_bytes) + bytearray(data_bytes))
 

@@ -13,7 +13,7 @@ from helper import (serial_port, generate_master_write_read_requests,
 class TestI2cMaster:
     REQUEST_COUNT = 4 * 1000
     DATA_SIZE_MIN = 1
-    DATA_SIZE_MAX = 64 - tiny_frame.TF_FRAME_OVERHEAD_SIZE - 24
+    DATA_SIZE_MAX = 128
 
     I2C_CLOCK_FREQ = 400000
     I2C0_SLAVE_ADDR = 0x01
@@ -42,11 +42,13 @@ class TestI2cMaster:
         requests_pipeline0 = generate_master_write_read_requests(slave_addr=TestI2cMaster.FRAM_SLAVE_ADDR,
                                                                  min_addr=TestI2cMaster.FRAM_0_MIN_ADDR,
                                                                  max_addr=TestI2cMaster.FRAM_0_MAX_ADDR,
+                                                                 min_size=TestI2cMaster.DATA_SIZE_MIN,
                                                                  max_size=TestI2cMaster.DATA_SIZE_MAX,
                                                                  count=TestI2cMaster.REQUEST_COUNT // 4)
         requests_pipeline1 = generate_master_write_read_requests(slave_addr=TestI2cMaster.FRAM_SLAVE_ADDR,
                                                                  min_addr=TestI2cMaster.FRAM_1_MIN_ADDR,
                                                                  max_addr=TestI2cMaster.FRAM_1_MAX_ADDR,
+                                                                 min_size=TestI2cMaster.DATA_SIZE_MIN,
                                                                  max_size=TestI2cMaster.DATA_SIZE_MAX,
                                                                  count=TestI2cMaster.REQUEST_COUNT // 4)
         requests_pipeline1 = []

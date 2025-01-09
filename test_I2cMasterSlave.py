@@ -14,7 +14,7 @@ from helper import (serial_port, generate_master_write_read_requests,
 class TestI2cMasterSlave:
     REQUEST_COUNT = 4 * 1000
     DATA_SIZE_MIN = 1
-    DATA_SIZE_MAX = 64 - tiny_frame.TF_FRAME_OVERHEAD_SIZE - 24
+    DATA_SIZE_MAX = 128
 
     I2C_CLOCK_FREQ = 400000
     I2C0_SLAVE_ADDR = 0x01
@@ -110,11 +110,13 @@ class TestI2cMasterSlave:
         requests_pipeline0 = generate_master_write_read_requests(slave_addr=TestI2cMasterSlave.I2C1_SLAVE_ADDR,
                                                                  min_addr=0,
                                                                  max_addr=pm.I2C_SLAVE_BUFFER_SPACE - 1,
+                                                                 min_size=TestI2cMasterSlave.DATA_SIZE_MIN,
                                                                  max_size=TestI2cMasterSlave.DATA_SIZE_MAX,
                                                                  count=TestI2cMasterSlave.REQUEST_COUNT // 4)
         requests_pipeline1 = generate_master_write_read_requests(slave_addr=TestI2cMasterSlave.I2C0_SLAVE_ADDR,
                                                                  min_addr=0,
                                                                  max_addr=pm.I2C_SLAVE_BUFFER_SPACE - 1,
+                                                                 min_size=TestI2cMasterSlave.DATA_SIZE_MIN,
                                                                  max_size=TestI2cMasterSlave.DATA_SIZE_MAX,
                                                                  count=TestI2cMasterSlave.REQUEST_COUNT // 4)
         # requests_pipeline1 = []

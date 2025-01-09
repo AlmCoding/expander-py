@@ -14,7 +14,7 @@ from helper import serial_port, generate_ascii_data
 class TestI2cSlave:
     REQUEST_COUNT = 4 * 1000
     DATA_SIZE_MIN = 1
-    DATA_SIZE_MAX = 64 - tiny_frame.TF_FRAME_OVERHEAD_SIZE - 24
+    DATA_SIZE_MAX = 128
 
     I2C_CLOCK_FREQ = 400000
     I2C0_SLAVE_ADDR = 0x01

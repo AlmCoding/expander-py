@@ -12,7 +12,7 @@ from helper import (serial_port, generate_master_write_read_requests,
 
 
 class TestI2cMasterSlave:
-    REQUEST_COUNT = 4 * 1000
+    REQUEST_COUNT = 4 * 4000
     DATA_SIZE_MIN = 1
     DATA_SIZE_MAX = 128
 
@@ -51,7 +51,7 @@ class TestI2cMasterSlave:
                 pytest.fail("Master(%d) request (id: %d) and slave access (id: %d) id mismatch!"
                             % (i2c_int.i2c_id.value, master_req.request_id, slave_not.access_id))
 
-            if master_req.read_size == 0 and len(master_req.write_data) > 2:
+            if master_req.read_size == 0 and len(master_req.write_data) >= 2:
                 # Master write request
                 TestI2cMasterSlave.verify_slave_master_write_notification(master_id.value, master_req,
                                                                           slave_id.value, slave_not)
@@ -60,8 +60,8 @@ class TestI2cMasterSlave:
                 TestI2cMasterSlave.verify_slave_master_read_notification(master_id.value, master_req,
                                                                          slave_id.value, slave_not)
             else:
-                pytest.fail("Invalid configuration (w_size: %d, r_size: %d) of master(%d) request!"
-                            % (i2c_int.i2c_id.value, len(master_req.write_data), master_req.read_size))
+                pytest.fail("Master(%d) request (id: %d) invalid configuration (w_size: %d, r_size: %d) detected!" %
+                            (i2c_int.i2c_id.value, master_req.request_id, len(master_req.write_data), master_req.read_size))
 
     @staticmethod
     def verify_slave_master_write_notification(master_id: int, master_req, slave_id: int, slave_not):
@@ -119,10 +119,12 @@ class TestI2cMasterSlave:
                                                                  min_size=TestI2cMasterSlave.DATA_SIZE_MIN,
                                                                  max_size=TestI2cMasterSlave.DATA_SIZE_MAX,
                                                                  count=TestI2cMasterSlave.REQUEST_COUNT // 4)
-        # requests_pipeline1 = []
+        requests_pipeline1 = []
+
         while True:
             i2c_send_master_request(i2c_int0, requests_pipeline0)
             i2c_send_master_request(i2c_int1, requests_pipeline1)
+            # time.sleep(0.015)
 
             if serial_port.in_waiting > 0:
                 # Read the incoming data

@@ -347,7 +347,7 @@ class I2cInterface:
                 request.callback_fn(request)
 
         elif inner_msg == "slave_notification":
-            access_id = msg.slave_status.request_id
+            access_id = msg.slave_notification.access_id
 
             if access_id in self.slave_access_notifications.keys():
                 raise Exception("Duplicate slave(%d) access (id: %d)" % (self.i2c_id.value, access_id))

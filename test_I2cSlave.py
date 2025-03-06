@@ -81,7 +81,8 @@ class TestI2cSlave:
 
         while True:
             TestI2cSlave.i2c_send(i2c_int0, requests_pipeline0)
-            TestI2cSlave.i2c_send(i2c_int1, requests_pipeline1)
+            if len(requests_pipeline0) == 0 and len(i2c_int0.get_pending_slave_request_ids()) == 0:
+                TestI2cSlave.i2c_send(i2c_int1, requests_pipeline1)
 
             if serial_port.in_waiting > 0:
                 # Read the incoming data

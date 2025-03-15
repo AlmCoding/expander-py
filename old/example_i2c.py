@@ -6,7 +6,7 @@
 import sys
 import random
 import serial
-from msg import proto_i2c_msg as pm
+from msg import I2cInterface as pm
 import msg.tiny_frame as tiny_frame
 from helper import get_com_port, print_error, generate_ascii_data
 

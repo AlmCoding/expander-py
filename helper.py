@@ -5,8 +5,8 @@ import random
 import pytest
 import serial.tools.list_ports
 from msg import tiny_frame
-from msg import proto_i2c_msg as pm
-from msg import proto_ctrl_msg as ctrl_pm
+from msg import I2cInterface as pm
+from msg import CtrlInterface as ctrl_pm
 
 
 def print_error(*args, **kwargs):

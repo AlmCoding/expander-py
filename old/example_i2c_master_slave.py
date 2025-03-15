@@ -5,7 +5,7 @@
 
 import sys
 import serial
-from msg import proto_i2c_msg as pm
+from msg import I2cInterface as pm
 from msg import tiny_frame
 from helper import (get_com_port, print_error, generate_master_write_read_requests,
                     i2c_send_master_request, verify_master_write_read_requests)

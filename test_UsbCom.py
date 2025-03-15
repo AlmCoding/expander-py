@@ -20,7 +20,7 @@ def tiny_frame_receive_cb(_, tf_msg):
 
 
 class TestUsbCom:
-    LOOP_COUNT = 1000
+    LOOP_COUNT = 10000
     DATA_SIZE_MIN = 1
     DATA_SIZE_MAX = 256 + 64
 

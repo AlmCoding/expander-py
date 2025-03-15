@@ -6,13 +6,13 @@
 import time
 import pytest
 from msg import tiny_frame
-from msg import proto_i2c_msg as pm
+from msg import I2cInterface as pm
 from helper import (serial_port, generate_master_write_read_requests,
                     i2c_send_master_request, verify_master_write_read_requests)
 
 
 class TestI2cMasterSlave:
-    REQUEST_COUNT = 4 * 4000
+    REQUEST_COUNT = 4 * 5000
     DATA_SIZE_MIN = 1
     DATA_SIZE_MAX = 128
 

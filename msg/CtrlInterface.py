@@ -4,12 +4,12 @@ import msg.tiny_frame as tf
 
 class CtrlInterface:
     SequenceNumber = 0
-    Synchronized = True
+    # Synchronized = True
 
     @staticmethod
-    def send_system_reset_msg() -> None:
+    def send_system_reset() -> None:
         CtrlInterface.SequenceNumber += 1
-        CtrlInterface.Synchronized = False
+        # CtrlInterface.Synchronized = False
 
         msg = ctrl_pb2.CtrlMsg()
         msg.sequence_number = CtrlInterface.SequenceNumber
@@ -21,7 +21,7 @@ class CtrlInterface:
     @staticmethod
     def receive_msg_cb(msg: ctrl_pb2.CtrlMsg):
         if msg.sequence_number < CtrlInterface.SequenceNumber:
-            print("Rejected CTRL msg! ==========================#")
+            print("Rejected CTRL msg!")
             return
 
 

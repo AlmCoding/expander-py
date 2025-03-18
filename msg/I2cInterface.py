@@ -338,66 +338,74 @@ class I2cInterface:
             time.sleep(0.001)
         return request
 
+    def handle_config_status(self, msg: i2c_pb2.I2cMsg):
+        if msg.config_status.request_id == self.config.request_id:
+            self.config.status_code = I2cStatusCode(msg.config_status.status_code)
+            print("Response to config request (id: %d)" % self.config.request_id)
+
+    def handle_master_status(self, msg: i2c_pb2.I2cMsg):
+        update_space = False
+        if msg.sequence_number >= self.sequence_number:
+            self.master_queue_space = msg.master_status.queue_space
+            self.master_buffer_space1 = msg.master_status.buffer_space1
+            self.master_buffer_space2 = msg.master_status.buffer_space2
+            update_space = True
+
+        request_id = msg.master_status.request_id
+        if request_id not in self.master_requests.keys():
+            raise Exception("Unknown master(%d) request (id: %d)" % (self.i2c_id.value, request_id))
+        if update_space:
+            print("Response to master(%d) request (id: %d) | Update (sp1: %d, sp2: %d)" %
+                    (self.i2c_id.value, request_id, self.master_buffer_space1, self.master_buffer_space2))
+        else:
+            print("Response to master(%d) request (id: %d)" % (self.i2c_id.value, request_id))
+
+        self.master_requests[request_id].status_code = I2cStatusCode(msg.master_status.status_code)
+        self.master_requests[request_id].read_data = msg.master_status.read_data
+        if self.master_requests[request_id].callback_fn:
+            request = self.master_requests.pop(request_id)
+            request.callback_fn(request)
+
+    def handle_slave_status(self, msg: i2c_pb2.I2cMsg):
+        if msg.sequence_number >= self.sequence_number:
+            self.slave_queue_space = msg.slave_status.queue_space
+
+        request_id = msg.slave_status.request_id
+
+        if request_id not in self.slave_requests.keys():
+            raise Exception("Unknown slave(%d) request (id: %d)" % (self.i2c_id.value, request_id))
+        print("Response to slave(%d) request (id: %d)" % (self.i2c_id.value, request_id))
+
+        self.slave_requests[request_id].status_code = I2cStatusCode(msg.slave_status.status_code)
+        self.slave_requests[request_id].read_data = msg.slave_status.read_data
+        if self.slave_requests[request_id].callback_fn:
+            request = self.slave_requests.pop(request_id)
+            request.callback_fn(request)
+
+    def handle_slave_notification(self,msg: i2c_pb2.I2cMsg):
+        access_id = msg.slave_notification.access_id
+
+        if access_id in self.slave_access_notifications.keys():
+            raise Exception("Duplicate slave(%d) access (id: %d)" % (self.i2c_id.value, access_id))
+
+        notification = I2cSlaveNotification(msg.slave_notification.access_id, msg.slave_notification.status_code,
+                                        msg.slave_notification.write_data, msg.slave_notification.read_data)
+        self.slave_access_notifications[notification.access_id] = notification
+
+        print("Notification slave(%d) access (id: %d, w_data: %s (%d), r_data: %s (%d)"
+                % (self.i2c_id.value, access_id, notification.write_data, len(notification.write_data),
+                    notification.read_data, len(notification.read_data)))
+
     def receive_msg_cb(self, msg: i2c_pb2.I2cMsg) -> None:
         inner_msg = msg.WhichOneof("msg")
-        update_space = False
         if inner_msg == "config_status":
-            if msg.config_status.request_id == self.config.request_id:
-                self.config.status_code = I2cStatusCode(msg.config_status.status_code)
-                print("Response to config request (id: %d)" % self.config.request_id)
-
+            self.handle_config_status(msg)
         elif inner_msg == "master_status":
-            if msg.sequence_number >= self.sequence_number:
-                self.master_queue_space = msg.master_status.queue_space
-                self.master_buffer_space1 = msg.master_status.buffer_space1
-                self.master_buffer_space2 = msg.master_status.buffer_space2
-                update_space = True
-
-            request_id = msg.master_status.request_id
-            if request_id not in self.master_requests.keys():
-                raise Exception("Unknown master(%d) request (id: %d)" % (self.i2c_id.value, request_id))
-            if update_space:
-                print("Response to master(%d) request (id: %d) | Update (sp1: %d, sp2: %d)" %
-                      (self.i2c_id.value, request_id, self.master_buffer_space1, self.master_buffer_space2))
-            else:
-                print("Response to master(%d) request (id: %d)" % (self.i2c_id.value, request_id))
-
-            self.master_requests[request_id].status_code = I2cStatusCode(msg.master_status.status_code)
-            self.master_requests[request_id].read_data = msg.master_status.read_data
-            if self.master_requests[request_id].callback_fn:
-                request = self.master_requests.pop(request_id)
-                request.callback_fn(request)
-
+            self.handle_master_status(msg)
         elif inner_msg == "slave_status":
-            if msg.sequence_number >= self.sequence_number:
-                self.slave_queue_space = msg.slave_status.queue_space
-
-            request_id = msg.slave_status.request_id
-
-            if request_id not in self.slave_requests.keys():
-                raise Exception("Unknown slave(%d) request (id: %d)" % (self.i2c_id.value, request_id))
-            print("Response to slave(%d) request (id: %d)" % (self.i2c_id.value, request_id))
-
-            self.slave_requests[request_id].status_code = I2cStatusCode(msg.slave_status.status_code)
-            self.slave_requests[request_id].read_data = msg.slave_status.read_data
-            if self.slave_requests[request_id].callback_fn:
-                request = self.slave_requests.pop(request_id)
-                request.callback_fn(request)
-
+            self.handle_slave_status(msg)
         elif inner_msg == "slave_notification":
-            access_id = msg.slave_notification.access_id
-
-            if access_id in self.slave_access_notifications.keys():
-                raise Exception("Duplicate slave(%d) access (id: %d)" % (self.i2c_id.value, access_id))
-
-            notification = I2cSlaveAccess(msg.slave_notification.access_id, msg.slave_notification.status_code,
-                                          msg.slave_notification.write_data, msg.slave_notification.read_data)
-            self.slave_access_notifications[notification.access_id] = notification
-
-            print("Notification slave(%d) access (id: %d, w_data: %s (%d), r_data: %s (%d)"
-                  % (self.i2c_id.value, access_id, notification.write_data, len(notification.write_data),
-                     notification.read_data, len(notification.read_data)))
-            
+            self.handle_slave_notification(msg)
         else:
             raise Exception("Invalid I2C message type!")
 

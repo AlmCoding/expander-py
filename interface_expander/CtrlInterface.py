@@ -1,5 +1,5 @@
-from proto.proto_py import ctrl_pb2
-import msg.tiny_frame as tf
+from libraries.proto.proto_py import ctrl_pb2
+import interface_expander.tiny_frame as tf
 
 
 class CtrlInterface:

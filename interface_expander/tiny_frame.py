@@ -1,4 +1,4 @@
-import tf.TinyFrame as TF
+import libraries.tf.TinyFrame as TF
 from enum import Enum
 
 

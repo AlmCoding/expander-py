@@ -1,12 +1,13 @@
-from proto.proto_py import i2c_pb2
+from libraries.proto.proto_py import i2c_pb2
 from enum import Enum
-import msg.tiny_frame as tf
+import interface_expander.tiny_frame as tf
+import interface_expander.InterfaceExpander as intexp
 import time
 
 I2C_MASTER_QUEUE_SPACE = 4
 I2C_MASTER_BUFFER_SPACE = 512
 I2C_SLAVE_QUEUE_SPACE = 4
-I2C_SLAVE_BUFFER_SPACE = 512
+I2C_SLAVE_BUFFER_SPACE = pow(2, 16)
 
 
 class I2cId(Enum):
@@ -91,9 +92,10 @@ class I2cSlaveNotification:
 
 
 class I2cInterface:
-    def __init__(self, i2c_id: I2cId, config: I2cConfig):
+    def __init__(self, i2c_id: I2cId, config: I2cConfig, slave_callback_fn=None):
         self.i2c_id = i2c_id
         self.config = config
+        self.slave_callback_fn = slave_callback_fn
 
         self.sequence_number = 0  # Proto message synchronization
         self.request_id_counter = 0
@@ -253,6 +255,7 @@ class I2cInterface:
         return config.status_code
 
     def send_request(self, request) -> int:
+        intexp.EXPANDER_INSTANCE.read_all()
         if isinstance(request, I2cMasterRequest):
             return self.send_master_request(request)
         elif isinstance(request, I2cSlaveRequest):
@@ -333,9 +336,10 @@ class I2cInterface:
 
         start_time = time.time()
         while request.status_code == I2cStatusCode.PENDING:
-            if (time.time() - start_time) * 1000 > timeout:
+            intexp.EXPANDER_INSTANCE.read_all()
+            if time.time() - start_time > timeout / 1000:
                 raise Exception("Timeout waiting for response (id: %d)" % request_id)
-            time.sleep(0.001)
+
         return request
 
     def handle_config_status(self, msg: i2c_pb2.I2cMsg):
@@ -390,11 +394,15 @@ class I2cInterface:
 
         notification = I2cSlaveNotification(msg.slave_notification.access_id, msg.slave_notification.status_code,
                                         msg.slave_notification.write_data, msg.slave_notification.read_data)
-        self.slave_access_notifications[notification.access_id] = notification
-
+        
         print("Notification slave(%d) access (id: %d, w_data: %s (%d), r_data: %s (%d)"
                 % (self.i2c_id.value, access_id, notification.write_data, len(notification.write_data),
                     notification.read_data, len(notification.read_data)))
+
+        if self.slave_callback_fn:
+            self.slave_callback_fn(notification)
+        else:
+            self.slave_access_notifications[notification.access_id] = notification
 
     def receive_msg_cb(self, msg: i2c_pb2.I2cMsg) -> None:
         inner_msg = msg.WhichOneof("msg")

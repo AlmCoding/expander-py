@@ -255,7 +255,7 @@ class I2cInterface:
         return config.status_code
 
     def send_request(self, request) -> int:
-        intexp.EXPANDER_INSTANCE.read_all()
+        intexp.InterfaceExpander().read_all()
         if isinstance(request, I2cMasterRequest):
             return self.send_master_request(request)
         elif isinstance(request, I2cSlaveRequest):
@@ -336,7 +336,7 @@ class I2cInterface:
 
         start_time = time.time()
         while request.status_code == I2cStatusCode.PENDING:
-            intexp.EXPANDER_INSTANCE.read_all()
+            intexp.InterfaceExpander().read_all()
             if time.time() - start_time > timeout / 1000:
                 raise Exception("Timeout waiting for response (id: %d)" % request_id)
 

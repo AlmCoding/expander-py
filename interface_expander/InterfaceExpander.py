@@ -5,24 +5,21 @@ from interface_expander.tiny_frame import tf_init
 from interface_expander.CtrlInterface import CtrlInterface
 
 
-EXPANDER_INSTANCE = None
+class Singleton(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
 
 
-class InterfaceExpander:
+class InterfaceExpander(metaclass=Singleton):
     def __init__(self):
         self.serial_port = None
         self.tf = None
         self.read_thread = None
         self.running = False
-
-        global EXPANDER_INSTANCE
-        EXPANDER_INSTANCE = self
-
-    def __del__(self):
-        self.disconnect()
-        
-        global EXPANDER_INSTANCE
-        EXPANDER_INSTANCE = None
 
     @staticmethod
     def get_port_name() -> str:

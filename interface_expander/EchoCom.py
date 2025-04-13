@@ -22,7 +22,7 @@ class EchoCom:
         """Wait for an echo message from the USB interface."""
         start_time = time.time()
         while not self.received_data:
-            intexp.EXPANDER_INSTANCE.read_all()
+            intexp.InterfaceExpander().read_all()
             if time.time() - start_time > timeout / 1000:
                 return None
         return self.received_data

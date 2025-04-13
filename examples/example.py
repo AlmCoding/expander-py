@@ -32,5 +32,3 @@ if __name__ == "__main__":
     i2c1.wait_for_response(request_id=rid, timeout=1000)
 
     expander.disconnect()
-
-    exit(0)

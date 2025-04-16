@@ -26,9 +26,7 @@ class CtrlInterface:
 
 
 def receive_ctrl_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:
-    msg = ctrl_pb2.GpioMsg()
-    msg.ParseFromString(bytes(tf_msg.data))
-    CtrlInterface.receive_msg_cb(msg)
+    pass
 
 
 tf.tf_register_callback(tf.TfMsgType.TYPE_CTRL, receive_ctrl_msg_cb)

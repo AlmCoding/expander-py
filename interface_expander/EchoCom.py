@@ -18,13 +18,16 @@ class EchoCom:
         self.received_data = None
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_ECHO.value, data, 0)
 
-    def read_echo(self, timeout: int):
+    def read_echo(self, timeout: float):
         """Wait for an echo message from the USB interface."""
         start_time = time.time()
-        while not self.received_data:
+        while True:
             intexp.InterfaceExpander().read_all()
-            if time.time() - start_time > timeout / 1000:
-                return None
+            if self.received_data:
+                break
+            elif time.time() - start_time > timeout:
+                raise TimeoutError("Timeout waiting for echo message!")
+            
         return self.received_data
 
 

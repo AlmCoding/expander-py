@@ -9,7 +9,6 @@ def callback(request):
 
 if __name__ == "__main__":
     expander = InterfaceExpander()
-    expander.reset()
     expander.connect()
 
     cfg0 = I2cConfig(clock_freq=ClockFreq.FREQ400K,
@@ -21,14 +20,14 @@ if __name__ == "__main__":
                      slave_addr_width=AddressWidth.Bits7,
                      mem_addr_width=AddressWidth.Bits16)
 
-    i2c0 = I2cInterface(i2c_id=I2cId.I2C0, config=cfg0, slave_callback_fn=None)
-    i2c1 = I2cInterface(i2c_id=I2cId.I2C1, config=cfg1, slave_callback_fn=None)
+    i2c0 = I2cInterface(i2c_id=I2cId.I2C0, config=cfg0, callback_fn=None)
+    i2c1 = I2cInterface(i2c_id=I2cId.I2C1, config=cfg1, callback_fn=None)
 
     request = I2cMasterRequest(slave_addr=0x50, write_data=bytes([0x00, 0x01, 0x42]), read_size=0, callback_fn=callback)
     rid = i2c0.send_request(request=request)
-    i2c0.wait_for_response(request_id=rid, timeout=1000)
+    i2c0.wait_for_response(request_id=rid, timeout=0.1)
 
     rid = i2c1.send_request(request=request)
-    i2c1.wait_for_response(request_id=rid, timeout=1000)
+    i2c1.wait_for_response(request_id=rid, timeout=0.1)
 
     expander.disconnect()

@@ -18,8 +18,8 @@ class InterfaceExpander(metaclass=Singleton):
     def __init__(self):
         self.serial_port = None
         self.tf = None
-        self.read_thread = None
-        self.running = False
+        # self.read_thread = None
+        # self.running = False
 
     @staticmethod
     def get_port_name() -> str:
@@ -41,13 +41,13 @@ class InterfaceExpander(metaclass=Singleton):
         self.serial_port = self.get_serial_port()
         self.tf = tf_init(self.serial_port.write)
 
-        self.running = True
+        # self.running = True
         # self.read_thread = threading.Thread(target=self.read)
         # self.read_thread.daemon = True
         # self.read_thread.start()
 
     def disconnect(self):
-        self.running = False
+        # self.running = False
         # if self.read_thread:
         #    self.read_thread.join()
         #    self.read_thread = None
@@ -59,16 +59,13 @@ class InterfaceExpander(metaclass=Singleton):
 
     def reset(self, wait_sec=3):
         self.connect()
-        self.running = False
+        # self.running = False
         CtrlInterface.send_system_reset()
         self.disconnect()
         time.sleep(wait_sec)
 
     """
     def read(self):
-        while True:
-            time.sleep(1)
-
         while self.running and self.serial_port and self.serial_port.isOpen():
             if self.serial_port.in_waiting > 0:
                 rx_data = self.serial_port.read(self.serial_port.in_waiting)

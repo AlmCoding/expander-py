@@ -110,8 +110,8 @@ class TestI2cMasterSlave:
                          slave_addr_width=AddressWidth.Bits7,
                          mem_addr_width=AddressWidth.Bits16)
 
-        i2c0 = I2cInterface(i2c_id=I2cId.I2C0, config=cfg0, slave_callback_fn=None)
-        i2c1 = I2cInterface(i2c_id=I2cId.I2C1, config=cfg1, slave_callback_fn=None)
+        i2c0 = I2cInterface(i2c_id=I2cId.I2C0, config=cfg0, callback_fn=None)
+        i2c1 = I2cInterface(i2c_id=I2cId.I2C1, config=cfg1, callback_fn=None)
         i2c0.request_id_counter = 0  # Rest request id counter to 0 for request id and notification id matching
         i2c1.request_id_counter = 0  # Rest request id counter to 0 for request id and notification id matching
 
@@ -130,22 +130,22 @@ class TestI2cMasterSlave:
 
         while len(requests_pipeline0) > 0 or len(requests_pipeline1) > 0:
             rid = i2c_send_master_request(i2c0, requests_pipeline0)  # Write data
-            i2c0.wait_for_response(request_id=rid, timeout=100)
+            i2c0.wait_for_response(request_id=rid, timeout=0.1)
             TestI2cMasterSlave.verify_request_notification_flow(i2c0, i2c1)
 
             rid = i2c_send_master_request(i2c0, requests_pipeline0)  # Read data
-            i2c0.wait_for_response(request_id=rid, timeout=100)
+            i2c0.wait_for_response(request_id=rid, timeout=0.1)
             TestI2cMasterSlave.verify_request_notification_flow(i2c0, i2c1)
 
             complete_master_requests = verify_master_write_read_requests(i2c0)
             TestI2cMasterSlave.verify_slave_notifications(i2c1, complete_master_requests)
 
             rid = i2c_send_master_request(i2c1, requests_pipeline1)
-            i2c1.wait_for_response(request_id=rid, timeout=100)
+            i2c1.wait_for_response(request_id=rid, timeout=0.1)
             TestI2cMasterSlave.verify_request_notification_flow(i2c1, i2c0)
 
             rid = i2c_send_master_request(i2c1, requests_pipeline1)
-            i2c1.wait_for_response(request_id=rid, timeout=100)
+            i2c1.wait_for_response(request_id=rid, timeout=0.1)
             TestI2cMasterSlave.verify_request_notification_flow(i2c1, i2c0)
 
             complete_master_requests = verify_master_write_read_requests(i2c1)

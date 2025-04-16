@@ -25,8 +25,7 @@ class TestUsbCom:
             tx_data = generate_ascii_data(TestUsbCom.DATA_SIZE_MIN, TestUsbCom.DATA_SIZE_MAX)
             usb_com.send(tx_data)
             print(f"Send: {tx_data}")
-            echo = usb_com.read_echo(timeout=20)
-            assert echo
+            echo = usb_com.read_echo(timeout=0.02)
             assert echo == tx_data
             counter -= 1
 

@@ -220,7 +220,7 @@ class I2cInterface:
             self.slave_access_notifications.clear()
         return notifications
 
-    def apply_config(self, config: I2cConfig, timeout=1.0) -> I2cStatusCode:
+    def apply_config(self, config: I2cConfig, timeout: float = 1.0) -> I2cStatusCode:
         if not isinstance(config, I2cConfig):
             raise ValueError("Invalid configuration!")
         if config.slave_addr_width != AddressWidth.Bits7 and config.slave_addr_width != AddressWidth.Bits10:
@@ -351,6 +351,7 @@ class I2cInterface:
 
     def wait_for_slave_notification(self, access_id: int | None, timeout: float, pop_notification: bool = False) -> I2cSlaveNotification | None:
         notification = None
+        length = 0
         if access_id is None or access_id < 0:
             length = len(self.slave_access_notifications)
 
@@ -358,7 +359,7 @@ class I2cInterface:
         while True:
             intexp.InterfaceExpander().read_all()
             if (access_id is None or access_id < 0) and len(self.slave_access_notifications) > length:
-                notification = self.slave_access_notifications[-1]
+                _, notification = next(reversed(self.slave_access_notifications.items()))
                 break
             elif access_id in self.slave_access_notifications.keys():
                 notification = self.slave_access_notifications[access_id]
@@ -366,7 +367,7 @@ class I2cInterface:
             elif time.time() - start_time > timeout:
                 break
 
-        if notification and pop_notification:
+        if notification is not None and pop_notification:
             del self.slave_access_notifications[notification.access_id]
 
         return notification
@@ -436,7 +437,8 @@ class I2cInterface:
         if access_id in self.slave_access_notifications.keys():
             raise Exception("Duplicate slave(%d) access (id: %d)" % (self.i2c_id.value, access_id))
 
-        notification = I2cSlaveNotification(msg.slave_notification.access_id, msg.slave_notification.status_code,
+        status_code = I2cStatusCode(msg.slave_notification.status_code)
+        notification = I2cSlaveNotification(msg.slave_notification.access_id, status_code,
                                             msg.slave_notification.write_data, msg.slave_notification.read_data)
         self.slave_access_notifications[notification.access_id] = notification
 
@@ -458,7 +460,7 @@ def receive_i2c_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:
     else:
         instance = I2C_INSTANCE[I2cId.I2C1]
 
-    if instance:
+    if instance is not None:
         instance.receive_msg_cb(msg)
 
 

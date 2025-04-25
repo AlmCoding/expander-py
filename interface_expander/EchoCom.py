@@ -34,7 +34,7 @@ class EchoCom:
 def receive_echo_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:
     """Receive an echo message from the USB interface."""
     global ECHO_INSTANCE
-    if ECHO_INSTANCE:
+    if ECHO_INSTANCE is not None:
         ECHO_INSTANCE.received_data = tf_msg.data
 
 

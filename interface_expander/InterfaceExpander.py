@@ -1,5 +1,5 @@
 import time
-import threading
+# import threading
 import serial.tools.list_ports
 from interface_expander.tiny_frame import tf_init
 from interface_expander.CtrlInterface import CtrlInterface
@@ -32,7 +32,7 @@ class InterfaceExpander(metaclass=Singleton):
 
     @staticmethod
     def get_serial_port():
-        port = serial.Serial(InterfaceExpander.get_port_name(), 115200, timeout=1)
+        port = serial.Serial(InterfaceExpander.get_port_name(), baudrate=115200, timeout=1.0)
         return port
 
     def connect(self):
@@ -42,7 +42,7 @@ class InterfaceExpander(metaclass=Singleton):
         self.tf = tf_init(self.serial_port.write)
 
         # self.running = True
-        # self.read_thread = threading.Thread(target=self.read)
+        # self.read_thread = threading.Thread(target=self.read_loop)
         # self.read_thread.daemon = True
         # self.read_thread.start()
 
@@ -65,7 +65,7 @@ class InterfaceExpander(metaclass=Singleton):
         time.sleep(wait_sec)
 
     """
-    def read(self):
+    def read_loop(self):
         while self.running and self.serial_port and self.serial_port.isOpen():
             if self.serial_port.in_waiting > 0:
                 rx_data = self.serial_port.read(self.serial_port.in_waiting)

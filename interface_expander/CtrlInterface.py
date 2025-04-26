@@ -1,4 +1,4 @@
-from libraries.proto.proto_py import ctrl_pb2
+from interface_expander.proto.proto_py import ctrl_pb2
 import interface_expander.tiny_frame as tf
 
 

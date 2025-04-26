@@ -1,4 +1,4 @@
-import libraries.tf.TinyFrame as TF
+import interface_expander.tf.TinyFrame as TF
 from enum import Enum
 
 

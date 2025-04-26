@@ -1,4 +1,4 @@
-from libraries.proto.proto_py import i2c_pb2
+from interface_expander.proto.proto_py import i2c_pb2
 from enum import Enum
 import interface_expander.tiny_frame as tf
 import interface_expander.InterfaceExpander as intexp

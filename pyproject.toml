@@ -12,7 +12,8 @@ authors = [
 license = { file = "LICENSE.md" }
 readme = "README.md"
 dependencies = [
-    "pyserial>=3.5"
+    "pyserial>=3.5",
+    "protobuf==5.29.4"
 ]
 
 [tool.setuptools]

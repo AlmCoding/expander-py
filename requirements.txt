@@ -1,5 +1,9 @@
-pyserial
-scons
-protobuf
-grpcio-tools
+pyserial>=3.5
+protobuf==5.29.4
+
 pytest
+setuptools
+build
+twine
+#scons
+#grpcio-tools

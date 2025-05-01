@@ -7,6 +7,10 @@ from interface_expander.Singleton import Singleton
 
 
 class InterfaceExpander(metaclass=Singleton):
+    VendorIds = [1155]
+    ProductIds = [22288]
+    SerialNumbers = ["EXPV1"]
+
     def __init__(self):
         self.serial_port = None
         self.tf = None
@@ -17,9 +21,10 @@ class InterfaceExpander(metaclass=Singleton):
     def _get_port_name() -> str:
         com_ports = serial.tools.list_ports.comports()
         for com_port in com_ports:
-            port, desc, hwid = com_port
-            if "Serial Device" in desc:
-                return port
+            if (com_port.vid in InterfaceExpander.VendorIds and
+                    com_port.pid in InterfaceExpander.ProductIds and
+                    com_port.serial_number in InterfaceExpander.SerialNumbers):
+                return com_port.device
         raise Exception("No valid Serial Port found!")
 
     @staticmethod

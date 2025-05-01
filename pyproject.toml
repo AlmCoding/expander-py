@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "interface-expander"
+version = "1.0.0"
+description = "A Python library for controlling the Interface Expander device"
+authors = [
+    { name = "AlmCoding", email = "your.email@example.com" }
+]
+license = { file = "LICENSE.md" }
+readme = "README.md"
+dependencies = [
+    "pyserial>=3.5",
+    "protobuf==5.29.4"
+]
+
+[tool.setuptools]
+packages = ["interface_expander"]
+
+[tool.setuptools.package-data]
+interface_expander = ["tf/*", "proto/proto_py/*"]
+
+[project.urls]
+"Homepage" = "https://github.com/AlmCoding/expander-py"
+"Repository" = "https://github.com/AlmCoding/expander-py"

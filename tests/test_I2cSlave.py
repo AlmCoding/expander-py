@@ -37,7 +37,7 @@ class TestI2cSlave:
     def i2c_send_slave_request(i2c_int: I2cInterface, request_queue: list[I2cSlaveRequest]):
         if len(request_queue) and i2c_int.can_accept_request(request_queue[0]):
             request = request_queue.pop(0)
-            rid = i2c_int.send_slave_request(request=request)
+            rid = i2c_int.send_request(request=request)
             print("Send slave({}) request (id: {}, w_addr: '{}', w_data: {} ({}), r_addr: '{}', r_size: {})"
                   .format(i2c_int.i2c_id.value, rid, request.write_addr, request.write_data,
                           len(request.write_data), request.read_addr, request.read_size))

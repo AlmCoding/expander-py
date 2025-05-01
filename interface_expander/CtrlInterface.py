@@ -1,32 +1,34 @@
-from interface_expander.proto.proto_py import ctrl_pb2
 import interface_expander.tiny_frame as tf
+from interface_expander.proto.proto_py import ctrl_pb2
+from interface_expander.Singleton import Singleton
 
 
-class CtrlInterface:
-    SequenceNumber = 0
-    # Synchronized = True
+class CtrlInterface(metaclass=Singleton):
+    def __init__(self):
+        self.sequence_number = 0  # Proto message synchronization
 
-    @staticmethod
-    def send_system_reset() -> None:
-        CtrlInterface.SequenceNumber += 1
-        # CtrlInterface.Synchronized = False
-
+    def _send_system_reset(self) -> None:
+        """Send a system reset message to the USB interface."""
+        self.sequence_number += 1
+       
         msg = ctrl_pb2.CtrlMsg()
-        msg.sequence_number = CtrlInterface.SequenceNumber
+        msg.sequence_number = self.sequence_number
         msg.ctrl_request.reset_system = True
 
         msg_bytes = msg.SerializeToString()
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_CTRL.value, msg_bytes, 0)
 
-    @staticmethod
-    def receive_msg_cb(msg: ctrl_pb2.CtrlMsg):
-        if msg.sequence_number < CtrlInterface.SequenceNumber:
-            print("Rejected CTRL msg!")
+    def _receive_msg_cb(self, msg: ctrl_pb2.CtrlMsg):
+        """Receive a control message from the USB interface."""
+        if msg.sequence_number < self.sequence_number:
             return
 
 
-def receive_ctrl_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:
-    pass
+def _receive_ctrl_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:
+    """Receive a control message from the USB interface."""
+    msg = ctrl_pb2.CtrlMsg()
+    msg.ParseFromString(tf_msg.data)
+    CtrlInterface()._receive_msg_cb(msg)
 
 
-tf.tf_register_callback(tf.TfMsgType.TYPE_CTRL, receive_ctrl_msg_cb)
+tf.tf_register_callback(tf.TfMsgType.TYPE_CTRL, _receive_ctrl_msg_cb)

@@ -145,7 +145,7 @@ class I2cInterface:
 
         return accept
 
-    def update_free_space(self, request) -> None:
+    def _update_free_space(self, request) -> None:
         if isinstance(request, I2cMasterRequest):
             self.master_queue_space -= 1
 
@@ -186,7 +186,7 @@ class I2cInterface:
     def pop_master_request(self, request_id: int) -> I2cMasterRequest:
         return self.master_requests.pop(request_id)
 
-    def pop_complete_master_requests(self) -> dict[I2cMasterRequest]:
+    def pop_complete_master_requests(self) -> dict[int, I2cMasterRequest]:
         complete_requests = {request.request_id: request for rid, request in self.master_requests.items()
                              if request.status_code != I2cStatusCode.PENDING}
         for rid in complete_requests.keys():
@@ -201,17 +201,17 @@ class I2cInterface:
         return [request.request_id for rid, request in self.slave_requests.items()
                 if request.status_code != I2cStatusCode.PENDING]
 
-    def pop_complete_slave_requests(self) -> dict[I2cSlaveRequest]:
+    def pop_complete_slave_requests(self) -> dict[int, I2cSlaveRequest]:
         complete_requests = {request.request_id: request for rid, request in self.slave_requests.items()
                              if request.status_code != I2cStatusCode.PENDING}
         for rid in complete_requests.keys():
             del self.slave_requests[rid]
         return complete_requests
 
-    def get_slave_access_notifications(self) -> dict[I2cSlaveNotification]:
+    def get_slave_access_notifications(self) -> dict[int, I2cSlaveNotification]:
         return self.slave_access_notifications.copy()
 
-    def pop_slave_access_notifications(self, count=-1) -> dict[I2cSlaveNotification]:
+    def pop_slave_access_notifications(self, count=-1) -> dict[int, I2cSlaveNotification]:
         if count > 0:
             keys = list(self.slave_access_notifications.keys())[:count]
             notifications = {key: self.slave_access_notifications.pop(key) for key in keys}
@@ -254,15 +254,15 @@ class I2cInterface:
         return config.status_code
 
     def send_request(self, request: I2cMasterRequest | I2cSlaveRequest) -> int:
-        intexp.InterfaceExpander().read_all()
+        intexp.InterfaceExpander()._read_all()
         if isinstance(request, I2cMasterRequest):
-            return self.send_master_request(request)
+            return self._send_master_request(request)
         elif isinstance(request, I2cSlaveRequest):
-            return self.send_slave_request(request)
+            return self._send_slave_request(request)
         else:
             raise ValueError("Invalid request type!")
 
-    def send_master_request(self, request: I2cMasterRequest) -> int:
+    def _send_master_request(self, request: I2cMasterRequest) -> int:
         if not isinstance(request, I2cMasterRequest):
             raise ValueError("Invalid request type!")
 
@@ -276,7 +276,7 @@ class I2cInterface:
         request.request_id = self.request_id_counter
 
         self.master_requests[request.request_id] = request
-        self.update_free_space(request)
+        self._update_free_space(request)
 
         msg = i2c_pb2.I2cMsg()
         msg.i2c_id = self.i2c_idm
@@ -293,7 +293,7 @@ class I2cInterface:
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_I2C.value, msg_bytes, 0)
         return request.request_id
 
-    def send_slave_request(self, request: I2cSlaveRequest) -> int:
+    def _send_slave_request(self, request: I2cSlaveRequest) -> int:
         if not isinstance(request, I2cSlaveRequest):
             raise Exception("Invalid request type!")
 
@@ -307,7 +307,7 @@ class I2cInterface:
         request.request_id = self.request_id_counter
 
         self.slave_requests[request.request_id] = request
-        self.update_free_space(request)
+        self._update_free_space(request)
 
         msg = i2c_pb2.I2cMsg()
         msg.i2c_id = self.i2c_idm
@@ -338,7 +338,7 @@ class I2cInterface:
 
         start_time = time.time()
         while True:
-            intexp.InterfaceExpander().read_all()
+            intexp.InterfaceExpander()._read_all()
             if request.status_code != I2cStatusCode.PENDING:
                 break
             elif time.time() - start_time > timeout:
@@ -357,7 +357,7 @@ class I2cInterface:
 
         start_time = time.time()
         while True:
-            intexp.InterfaceExpander().read_all()
+            intexp.InterfaceExpander()._read_all()
             if (access_id is None or access_id < 0) and len(self.slave_access_notifications) > length:
                 _, notification = next(reversed(self.slave_access_notifications.items()))
                 break
@@ -372,25 +372,25 @@ class I2cInterface:
 
         return notification
 
-    def receive_msg_cb(self, msg: i2c_pb2.I2cMsg) -> None:
+    def _receive_msg_cb(self, msg: i2c_pb2.I2cMsg) -> None:
         inner_msg = msg.WhichOneof("msg")
         if inner_msg == "config_status":
-            self.handle_config_status(msg)
+            self._handle_config_status(msg)
         elif inner_msg == "master_status":
-            self.handle_master_status(msg)
+            self._handle_master_status(msg)
         elif inner_msg == "slave_status":
-            self.handle_slave_status(msg)
+            self._handle_slave_status(msg)
         elif inner_msg == "slave_notification":
-            self.handle_slave_notification(msg)
+            self._handle_slave_notification(msg)
         else:
             raise ValueError("Invalid I2C message type!")
 
-    def handle_config_status(self, msg: i2c_pb2.I2cMsg):
+    def _handle_config_status(self, msg: i2c_pb2.I2cMsg):
         if msg.config_status.request_id == self.config.request_id:
             self.config.status_code = I2cStatusCode(msg.config_status.status_code)
             # print("Response to config request (id: %d)" % self.config.request_id)
 
-    def handle_master_status(self, msg: i2c_pb2.I2cMsg):
+    def _handle_master_status(self, msg: i2c_pb2.I2cMsg):
         update_space = False
         if msg.sequence_number >= self.sequence_number:
             self.master_queue_space = msg.master_status.queue_space
@@ -415,7 +415,7 @@ class I2cInterface:
             request = self.master_requests.pop(request_id)
             request.callback_fn(request)
 
-    def handle_slave_status(self, msg: i2c_pb2.I2cMsg):
+    def _handle_slave_status(self, msg: i2c_pb2.I2cMsg):
         if msg.sequence_number >= self.sequence_number:
             self.slave_queue_space = msg.slave_status.queue_space
 
@@ -431,7 +431,7 @@ class I2cInterface:
             request = self.slave_requests.pop(request_id)
             request.callback_fn(request)
 
-    def handle_slave_notification(self, msg: i2c_pb2.I2cMsg):
+    def _handle_slave_notification(self, msg: i2c_pb2.I2cMsg):
         access_id = msg.slave_notification.access_id
 
         if access_id in self.slave_access_notifications.keys():
@@ -450,7 +450,7 @@ class I2cInterface:
             self.callback_fn(notification)
 
 
-def receive_i2c_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:
+def _receive_i2c_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:
     global I2C_INSTANCE
     msg = i2c_pb2.I2cMsg()
     msg.ParseFromString(bytes(tf_msg.data))
@@ -461,7 +461,7 @@ def receive_i2c_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:
         instance = I2C_INSTANCE[I2cId.I2C1]
 
     if instance is not None:
-        instance.receive_msg_cb(msg)
+        instance._receive_msg_cb(msg)
 
 
-tf.tf_register_callback(tf.TfMsgType.TYPE_I2C, receive_i2c_msg_cb)
+tf.tf_register_callback(tf.TfMsgType.TYPE_I2C, _receive_i2c_msg_cb)

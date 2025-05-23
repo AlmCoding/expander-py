@@ -10,7 +10,7 @@ from interface_expander.I2cInterface import (I2cInterface, I2cConfig, ClockFreq,
 from tests.helper import generate_ascii_data
 
 
-class TestI2cSlave:
+class TestI2cSlaveConfig:
     REQUEST_COUNT = 4 * 1000
     DATA_SIZE_MIN = 1
     DATA_SIZE_MAX = 128
@@ -23,7 +23,7 @@ class TestI2cSlave:
     def generate_write_read_requests(count: int) -> list[I2cSlaveRequest]:
         requests = []
         for _ in range(count):
-            tx_data = generate_ascii_data(TestI2cSlave.DATA_SIZE_MIN, TestI2cSlave.DATA_SIZE_MAX)
+            tx_data = generate_ascii_data(TestI2cSlaveConfig.DATA_SIZE_MIN, TestI2cSlaveConfig.DATA_SIZE_MAX)
             mem_addr = random.randint(0, I2C_SLAVE_BUFFER_SPACE - len(tx_data) - 1)
 
             write_request = I2cSlaveRequest(write_addr=mem_addr, write_data=tx_data, read_addr=0, read_size=0)
@@ -67,11 +67,11 @@ class TestI2cSlave:
         expander.reset()
         expander.connect()
 
-        cfg0 = I2cConfig(clock_freq=TestI2cSlave.I2C_CLOCK_FREQ,
+        cfg0 = I2cConfig(clock_freq=TestI2cSlaveConfig.I2C_CLOCK_FREQ,
                          slave_addr=0x01,
                          slave_addr_width=AddressWidth.Bits7,
                          mem_addr_width=AddressWidth.Bits16)
-        cfg1 = I2cConfig(clock_freq=TestI2cSlave.I2C_CLOCK_FREQ,
+        cfg1 = I2cConfig(clock_freq=TestI2cSlaveConfig.I2C_CLOCK_FREQ,
                          slave_addr=0x02,
                          slave_addr_width=AddressWidth.Bits7,
                          mem_addr_width=AddressWidth.Bits16)
@@ -79,18 +79,18 @@ class TestI2cSlave:
         i2c0 = I2cInterface(i2c_id=I2cId.I2C0, config=cfg0, callback_fn=None)
         i2c1 = I2cInterface(i2c_id=I2cId.I2C1, config=cfg1, callback_fn=None)
 
-        requests_pipeline0 = TestI2cSlave.generate_write_read_requests(TestI2cSlave.REQUEST_COUNT // 4)
-        requests_pipeline1 = TestI2cSlave.generate_write_read_requests(TestI2cSlave.REQUEST_COUNT // 4)
+        requests_pipeline0 = TestI2cSlaveConfig.generate_write_read_requests(TestI2cSlaveConfig.REQUEST_COUNT // 4)
+        requests_pipeline1 = TestI2cSlaveConfig.generate_write_read_requests(TestI2cSlaveConfig.REQUEST_COUNT // 4)
 
         while len(requests_pipeline0) > 0 or len(requests_pipeline1) > 0:
-            _ = TestI2cSlave.i2c_send_slave_request(i2c0, requests_pipeline0)    # Write data
-            ridr = TestI2cSlave.i2c_send_slave_request(i2c0, requests_pipeline0) # Read data
+            _ = TestI2cSlaveConfig.i2c_send_slave_request(i2c0, requests_pipeline0)    # Write data
+            ridr = TestI2cSlaveConfig.i2c_send_slave_request(i2c0, requests_pipeline0) # Read data
             i2c0.wait_for_response(request_id=ridr, timeout=0.1)
-            TestI2cSlave.verify_requests(i2c0)
+            TestI2cSlaveConfig.verify_requests(i2c0)
 
-            _ = TestI2cSlave.i2c_send_slave_request(i2c1, requests_pipeline1)
-            ridr = TestI2cSlave.i2c_send_slave_request(i2c1, requests_pipeline1)
+            _ = TestI2cSlaveConfig.i2c_send_slave_request(i2c1, requests_pipeline1)
+            ridr = TestI2cSlaveConfig.i2c_send_slave_request(i2c1, requests_pipeline1)
             i2c1.wait_for_response(request_id=ridr, timeout=0.1)
-            TestI2cSlave.verify_requests(i2c1)
+            TestI2cSlaveConfig.verify_requests(i2c1)
 
         expander.disconnect()

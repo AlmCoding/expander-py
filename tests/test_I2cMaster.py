@@ -6,7 +6,7 @@
 from interface_expander.InterfaceExpander import InterfaceExpander
 from interface_expander.I2cInterface import I2cInterface, I2cConfig, ClockFreq, AddressWidth, I2cId, I2cMasterRequest
 from tests.helper import (generate_master_write_read_requests,
-                          i2c_send_master_request, verify_master_write_read_requests)
+                          i2c_send_request, verify_master_write_read_requests)
 
 
 class TestI2cMaster:
@@ -57,11 +57,11 @@ class TestI2cMaster:
                                                                  count=TestI2cMaster.REQUEST_COUNT // 4)
 
         while len(requests_pipeline0) > 0 or len(requests_pipeline1) > 0:
-            rid = i2c_send_master_request(i2c0, requests_pipeline0)
+            rid = i2c_send_request(i2c0, requests_pipeline0)
             i2c0.wait_for_response(request_id=rid, timeout=0.1)
             verify_master_write_read_requests(i2c0)
 
-            rid = i2c_send_master_request(i2c1, requests_pipeline1)
+            rid = i2c_send_request(i2c1, requests_pipeline1)
             i2c1.wait_for_response(request_id=rid, timeout=0.1)
             verify_master_write_read_requests(i2c1)
 

@@ -5,10 +5,11 @@
 
 import pytest
 from interface_expander.InterfaceExpander import InterfaceExpander
-from interface_expander.I2cInterface import I2cInterface, I2cConfig, ClockFreq, AddressWidth, I2cId, I2cMasterRequest, \
-    I2C_SLAVE_BUFFER_SPACE
-from tests.helper import (generate_master_write_read_requests,
-                          i2c_send_master_request, verify_master_write_read_requests)
+from interface_expander.I2cInterface import (I2cInterface, I2cConfig, ClockFreq, AddressWidth, I2cId, I2cMasterRequest,
+                                             I2cSlaveRequest, I2C_SLAVE_BUFFER_SPACE)
+from tests.helper import (generate_slave_config_requests,
+                          generate_master_write_read_requests,
+                          i2c_send_request, verify_master_write_read_requests)
 
 
 class TestI2cMasterSlave:
@@ -129,22 +130,22 @@ class TestI2cMasterSlave:
                                                                  count=TestI2cMasterSlave.REQUEST_COUNT // 4)
 
         while len(requests_pipeline0) > 0 or len(requests_pipeline1) > 0:
-            rid = i2c_send_master_request(i2c0, requests_pipeline0)  # Write data
+            rid = i2c_send_request(i2c0, requests_pipeline0)  # Write data
             i2c0.wait_for_response(request_id=rid, timeout=0.1)
             TestI2cMasterSlave.verify_request_notification_flow(i2c0, i2c1)
 
-            rid = i2c_send_master_request(i2c0, requests_pipeline0)  # Read data
+            rid = i2c_send_request(i2c0, requests_pipeline0)  # Read data
             i2c0.wait_for_response(request_id=rid, timeout=0.1)
             TestI2cMasterSlave.verify_request_notification_flow(i2c0, i2c1)
 
             complete_master_requests = verify_master_write_read_requests(i2c0)
             TestI2cMasterSlave.verify_slave_notifications(i2c1, complete_master_requests)
 
-            rid = i2c_send_master_request(i2c1, requests_pipeline1)
+            rid = i2c_send_request(i2c1, requests_pipeline1)
             i2c1.wait_for_response(request_id=rid, timeout=0.1)
             TestI2cMasterSlave.verify_request_notification_flow(i2c1, i2c0)
 
-            rid = i2c_send_master_request(i2c1, requests_pipeline1)
+            rid = i2c_send_request(i2c1, requests_pipeline1)
             i2c1.wait_for_response(request_id=rid, timeout=0.1)
             TestI2cMasterSlave.verify_request_notification_flow(i2c1, i2c0)
 
@@ -152,3 +153,107 @@ class TestI2cMasterSlave:
             TestI2cMasterSlave.verify_slave_notifications(i2c0, complete_master_requests)
 
         expander.disconnect()
+
+    @staticmethod
+    def generate_master_read_requests(slave_addr: int, mem_addr_width: AddressWidth,
+                                      config_pipeline: list[I2cSlaveRequest]):
+        # Generate master read requests
+        master_requests = []
+
+        for request in config_pipeline:
+            # Generate master read request
+            mem_addr = request.write_addr
+            read_size = len(request.write_data)
+            if mem_addr_width == AddressWidth.Bits8:
+                tx_bytes = bytes(mem_addr.to_bytes(1, 'big'))
+            else:
+                tx_bytes = bytes(mem_addr.to_bytes(2, 'big'))
+
+            read_request = I2cMasterRequest(slave_addr=slave_addr, write_data=tx_bytes, read_size=read_size)
+            master_requests.append(read_request)
+
+        return master_requests
+
+    def test_i2c_master_slave_2byte_mem_address(self):
+        # Test master and slave simultaneously
+        expander = InterfaceExpander()
+        expander.reset()
+        expander.connect()
+
+        # Two byte mem address width
+        cfg0 = I2cConfig(clock_freq=TestI2cMasterSlave.I2C_CLOCK_FREQ,
+                         slave_addr=0x01,
+                         slave_addr_width=AddressWidth.Bits7,
+                         mem_addr_width=AddressWidth.Bits16)  # <========= 2 Bytes
+        cfg1 = I2cConfig(clock_freq=TestI2cMasterSlave.I2C_CLOCK_FREQ,
+                         slave_addr=0x02,
+                         slave_addr_width=AddressWidth.Bits7,
+                         mem_addr_width=AddressWidth.Bits16)  # <========= 2 Bytes
+
+        i2c0 = I2cInterface(i2c_id=I2cId.I2C0, config=cfg0, callback_fn=None)
+        i2c1 = I2cInterface(i2c_id=I2cId.I2C1, config=cfg1, callback_fn=None)
+        i2c0.request_id_counter = 0  # Rest request id counter to 0 for request id and notification id matching
+        i2c1.request_id_counter = 0  # Rest request id counter to 0 for request id and notification id matching
+
+        config_pipeline = generate_slave_config_requests(min_addr=0,
+                                                         max_addr=I2C_SLAVE_BUFFER_SPACE - 1,
+                                                         min_size=TestI2cMasterSlave.DATA_SIZE_MIN,
+                                                         max_size=TestI2cMasterSlave.DATA_SIZE_MAX,
+                                                         count=TestI2cMasterSlave.REQUEST_COUNT // 4,
+                                                         with_read=False)  # Only write config requests needed
+        read_pipeline = TestI2cMasterSlave.generate_master_read_requests(slave_addr=cfg0.slave_addr,
+                                                                         mem_addr_width=cfg0.mem_addr_width,
+                                                                         config_pipeline=config_pipeline)
+
+        while len(config_pipeline) > 0 or len(read_pipeline) > 0:
+            rid = i2c_send_request(i2c0, config_pipeline)  # Send slave configuration (write)
+            write_req = i2c0.wait_for_response(request_id=rid, timeout=0.1)
+
+            rid = i2c_send_request(i2c1, read_pipeline)  # Read slave configuration using i2c
+            notification = i2c0.wait_for_slave_notification(access_id=None, timeout=0.1)
+            read_req = i2c1.wait_for_response(request_id=rid, timeout=0.1)
+
+            assert read_req.read_data == write_req.write_data
+            assert read_req.read_data == notification.read_data
+
+    def test_i2c_master_slave_1byte_mem_address(self):
+        # Test master and slave simultaneously
+        expander = InterfaceExpander()
+        expander.reset()
+        expander.connect()
+
+        # Two byte mem address width
+        cfg0 = I2cConfig(clock_freq=TestI2cMasterSlave.I2C_CLOCK_FREQ,
+                         slave_addr=0x01,
+                         slave_addr_width=AddressWidth.Bits7,
+                         mem_addr_width=AddressWidth.Bits8)  # <========= 1 Byte
+        cfg1 = I2cConfig(clock_freq=TestI2cMasterSlave.I2C_CLOCK_FREQ,
+                         slave_addr=0x02,
+                         slave_addr_width=AddressWidth.Bits7,
+                         mem_addr_width=AddressWidth.Bits8)  # <========= 1 Byte
+
+        i2c0 = I2cInterface(i2c_id=I2cId.I2C0, config=cfg0, callback_fn=None)
+        i2c1 = I2cInterface(i2c_id=I2cId.I2C1, config=cfg1, callback_fn=None)
+        i2c0.request_id_counter = 0  # Rest request id counter to 0 for request id and notification id matching
+        i2c1.request_id_counter = 0  # Rest request id counter to 0 for request id and notification id matching
+
+        config_pipeline = generate_slave_config_requests(min_addr=0,
+                                                         max_addr=pow(2, 8) - 1,
+                                                         min_size=TestI2cMasterSlave.DATA_SIZE_MIN,
+                                                         max_size=TestI2cMasterSlave.DATA_SIZE_MAX,
+                                                         count=TestI2cMasterSlave.REQUEST_COUNT // 4,
+                                                         with_read=False)  # Only write config requests needed
+        read_pipeline = TestI2cMasterSlave.generate_master_read_requests(slave_addr=cfg0.slave_addr,
+                                                                         mem_addr_width=cfg0.mem_addr_width,
+                                                                         config_pipeline=config_pipeline)
+
+        while len(config_pipeline) > 0 or len(read_pipeline) > 0:
+            rid = i2c_send_request(i2c0, config_pipeline)  # Send slave configuration (write)
+            write_req = i2c0.wait_for_response(request_id=rid, timeout=0.1)
+
+            rid = i2c_send_request(i2c1, read_pipeline)  # Read slave configuration using i2c
+            notification = i2c0.wait_for_slave_notification(access_id=None, timeout=0.1)
+            read_req = i2c1.wait_for_response(request_id=rid, timeout=0.1)
+
+            assert read_req.read_data == write_req.write_data
+            assert read_req.read_data == notification.read_data

@@ -3,9 +3,8 @@
 """ Testing I2c slave write and read memory updates (no physical I2c communication involved)
 """
 
-import random
 from interface_expander.InterfaceExpander import InterfaceExpander
-from interface_expander.I2cInterface import (I2cInterface, I2cConfig, ClockFreq, AddressWidth, I2cId, I2cSlaveRequest,
+from interface_expander.I2cInterface import (I2cInterface, I2cConfig, ClockFreq, AddressWidth, I2cId,
                                              I2C_SLAVE_BUFFER_SPACE, I2cStatusCode)
 from tests.helper import generate_slave_config_requests, i2c_send_request
 

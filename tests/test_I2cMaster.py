@@ -4,9 +4,8 @@
 """
 
 from interface_expander.InterfaceExpander import InterfaceExpander
-from interface_expander.I2cInterface import I2cInterface, I2cConfig, ClockFreq, AddressWidth, I2cId, I2cMasterRequest
-from tests.helper import (generate_master_write_read_requests,
-                          i2c_send_request, verify_master_write_read_requests)
+from interface_expander.I2cInterface import I2cInterface, I2cConfig, ClockFreq, AddressWidth, I2cId
+from tests.helper import generate_master_write_read_requests, i2c_send_request, verify_master_write_read_requests
 
 
 class TestI2cMaster:

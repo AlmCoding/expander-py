@@ -266,6 +266,9 @@ class I2cInterface:
         if not isinstance(request, I2cMasterRequest):
             raise ValueError("Invalid request type!")
 
+        if request.slave_addr == self.config.slave_addr:
+            raise ValueError("Invalid slave address (id: %d)" % request.slave_addr)
+
         if not self.can_accept_request(request):
             return -1
 

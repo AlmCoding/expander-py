@@ -8,7 +8,8 @@ I2C_MASTER_QUEUE_SPACE = 4
 I2C_MASTER_BUFFER_SPACE = 512
 I2C_SLAVE_QUEUE_SPACE = 4
 I2C_SLAVE_BUFFER_SPACE = pow(2, 16)
-
+I2C_MAX_WRITE_SIZE = 128
+I2C_MAX_READ_SIZE = 128
 
 class I2cId(Enum):
     I2C0 = 0
@@ -255,6 +256,7 @@ class I2cInterface:
 
     def send_request(self, request: I2cMasterRequest | I2cSlaveRequest) -> int:
         intexp.InterfaceExpander()._read_all()
+
         if isinstance(request, I2cMasterRequest):
             return self._send_master_request(request)
         elif isinstance(request, I2cSlaveRequest):
@@ -265,9 +267,15 @@ class I2cInterface:
     def _send_master_request(self, request: I2cMasterRequest) -> int:
         if not isinstance(request, I2cMasterRequest):
             raise ValueError("Invalid request type!")
-
+        
         if request.slave_addr == self.config.slave_addr:
-            raise ValueError("Invalid slave address (id: %d)" % request.slave_addr)
+            raise ValueError("Slave address in request collides with own slave address!")
+
+        if len(request.write_data) == 0 and request.read_size == 0:
+            raise ValueError("Write and read data cannot both be empty!")
+        
+        if len(request.write_data) > I2C_MAX_WRITE_SIZE or request.read_size > I2C_MAX_READ_SIZE:
+            raise ValueError("Write/read data size exceeds maximum allowed (%d)" % I2C_MAX_WRITE_SIZE)
 
         if not self.can_accept_request(request):
             return -1
@@ -299,6 +307,12 @@ class I2cInterface:
     def _send_slave_request(self, request: I2cSlaveRequest) -> int:
         if not isinstance(request, I2cSlaveRequest):
             raise Exception("Invalid request type!")
+
+        if len(request.write_data) == 0 and request.read_size == 0:
+            raise ValueError("Write and read data cannot both be empty!")
+        
+        if len(request.write_data) > I2C_MAX_WRITE_SIZE or request.read_size > I2C_MAX_READ_SIZE:
+            raise ValueError("Write/read data size exceeds maximum allowed (%d)" % I2C_MAX_WRITE_SIZE)
 
         if not self.can_accept_request(request):
             return -1

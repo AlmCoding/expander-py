@@ -22,9 +22,9 @@ class EchoCom(metaclass=Singleton):
                 break
             elif time.time() - start_time > timeout:
                 raise TimeoutError("Timeout waiting for echo message!")
-            
+
         return self.received_data
-    
+
     def _receive_msg_cb(self, msg: bytes):
         """Receive an echo message from the USB interface."""
         self.received_data = msg

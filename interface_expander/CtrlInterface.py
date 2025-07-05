@@ -10,7 +10,7 @@ class CtrlInterface(metaclass=Singleton):
     def _send_system_reset(self) -> None:
         """Send a system reset message to the USB interface."""
         self.sequence_number += 1
-       
+
         msg = ctrl_pb2.CtrlMsg()
         msg.sequence_number = self.sequence_number
         msg.ctrl_request.reset_system = True

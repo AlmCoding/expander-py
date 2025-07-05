@@ -1,5 +1,6 @@
 from interface_expander.proto.proto_py import i2c_pb2
 from enum import Enum
+from typing import Callable
 import interface_expander.tiny_frame as tf
 import interface_expander.InterfaceExpander as intexp
 import time
@@ -10,6 +11,7 @@ I2C_SLAVE_QUEUE_SPACE = 4
 I2C_SLAVE_BUFFER_SPACE = pow(2, 16)
 I2C_MAX_WRITE_SIZE = 128
 I2C_MAX_READ_SIZE = 128
+
 
 class I2cId(Enum):
     I2C0 = 0
@@ -50,7 +52,7 @@ class I2cStatusCode(Enum):
 
 class I2cConfig:
     def __init__(self, clock_freq: ClockFreq, slave_addr: int,
-                 slave_addr_width: AddressWidth, mem_addr_width: AddressWidth):
+                 slave_addr_width: AddressWidth, mem_addr_width: AddressWidth = AddressWidth.Bits16):
         self.status_code = I2cStatusCode.NOT_INIT
         self.request_id = None
         self.clock_freq = clock_freq
@@ -60,7 +62,7 @@ class I2cConfig:
 
 
 class I2cMasterRequest:
-    def __init__(self, slave_addr: int, write_data: bytes, read_size: int, callback_fn=None):
+    def __init__(self, slave_addr: int, write_data: bytes, read_size: int, callback_fn: Callable = None):
         self.status_code = I2cStatusCode.NOT_INIT
         self.request_id = None
         self.slave_addr = slave_addr
@@ -73,7 +75,8 @@ class I2cMasterRequest:
 
 
 class I2cSlaveRequest:
-    def __init__(self, write_addr: int, write_data: bytes, read_addr: int, read_size: int, callback_fn=None):
+    def __init__(self, write_addr: int, write_data: bytes, read_addr: int, read_size: int,
+                 callback_fn: Callable = None):
         self.status_code = I2cStatusCode.NOT_INIT
         self.request_id = None
         self.write_addr = write_addr
@@ -93,7 +96,7 @@ class I2cSlaveNotification:
 
 
 class I2cInterface:
-    def __init__(self, i2c_id: I2cId, config: I2cConfig, callback_fn=None):
+    def __init__(self, i2c_id: I2cId, config: I2cConfig, callback_fn: Callable = None):
         self.i2c_id = i2c_id
         self.config = config
         self.callback_fn = callback_fn  # Slave notifications callback
@@ -267,13 +270,13 @@ class I2cInterface:
     def _send_master_request(self, request: I2cMasterRequest) -> int:
         if not isinstance(request, I2cMasterRequest):
             raise ValueError("Invalid request type!")
-        
+
         if request.slave_addr == self.config.slave_addr:
             raise ValueError("Slave address in request collides with own slave address!")
 
         if len(request.write_data) == 0 and request.read_size == 0:
             raise ValueError("Write and read data cannot both be empty!")
-        
+
         if len(request.write_data) > I2C_MAX_WRITE_SIZE or request.read_size > I2C_MAX_READ_SIZE:
             raise ValueError("Write/read data size exceeds maximum allowed (%d)" % I2C_MAX_WRITE_SIZE)
 
@@ -310,7 +313,7 @@ class I2cInterface:
 
         if len(request.write_data) == 0 and request.read_size == 0:
             raise ValueError("Write and read data cannot both be empty!")
-        
+
         if len(request.write_data) > I2C_MAX_WRITE_SIZE or request.read_size > I2C_MAX_READ_SIZE:
             raise ValueError("Write/read data size exceeds maximum allowed (%d)" % I2C_MAX_WRITE_SIZE)
 
@@ -340,7 +343,8 @@ class I2cInterface:
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_I2C.value, msg_bytes, 0)
         return request.request_id
 
-    def wait_for_response(self, request_id: int, timeout: float, pop_request: bool = False) -> I2cMasterRequest | I2cSlaveRequest | I2cConfig:
+    def wait_for_response(self, request_id: int, timeout: float,
+                          pop_request: bool = False) -> I2cMasterRequest | I2cSlaveRequest | I2cConfig:
         if request_id in self.master_requests.keys():
             container = self.master_requests
             request = container[request_id]
@@ -360,13 +364,14 @@ class I2cInterface:
                 break
             elif time.time() - start_time > timeout:
                 raise TimeoutError("Timeout waiting for response (id: %d)" % request_id)
-            
+
         if pop_request and container and request_id in container.keys():
             del container[request_id]
 
         return request
 
-    def wait_for_slave_notification(self, access_id: int | None, timeout: float, pop_notification: bool = False) -> I2cSlaveNotification | None:
+    def wait_for_slave_notification(self, access_id: int | None, timeout: float,
+                                    pop_notification: bool = False) -> I2cSlaveNotification | None:
         notification = None
         length = 0
         if access_id is None or access_id < 0:
@@ -425,7 +430,7 @@ class I2cInterface:
         else:
             print("Response to master(%d) request (id: %d)" % (self.i2c_id.value, request_id))
         """
-        
+
         self.master_requests[request_id].status_code = I2cStatusCode(msg.master_status.status_code)
         self.master_requests[request_id].read_data = msg.master_status.read_data
         if self.master_requests[request_id].callback_fn:

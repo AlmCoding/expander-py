@@ -33,6 +33,6 @@ if __name__ == "__main__":
     rid = i2c0.send_request(request=request)
 
     notification = i2c1.wait_for_slave_notification(access_id=None, timeout=0.02, pop_notification=True)
-    req = i2c0.wait_for_response(request_id=rid, timeout=0.02)
+    req = i2c0.wait_for_response(request_id=rid, timeout=0.01)
 
     expander.disconnect()

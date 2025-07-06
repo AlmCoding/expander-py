@@ -2,12 +2,13 @@ from interface_expander.I2cInterface import I2cInterface, I2cMasterRequest, I2cS
     I2C_MAX_WRITE_SIZE
 from intelhex import IntelHex
 from enum import Enum
+import math
 
 
 class MemoryType(Enum):
     FRAM = 0  # No write status polling required
     EEPROM = 1  # Requires write status polling
-    FLASH = 2  # Requires erase before write
+    # FLASH = 2  # Requires erase before write
 
 
 class MemoryAddressWidth(Enum):
@@ -35,7 +36,7 @@ class Memory:
             self.additional_address_bits = (self.memory_size - 1).bit_length() - self.address_width.value * 8
 
         self.buffer = bytearray(self.memory_size)
-        self.updated_sections = list()
+        self.updated_sections = []
 
     def _pack_slave_address(self, address: int) -> None:
         # Pack the additional address bits into the slave address byte (used by some FRAMs/EEPROMs)
@@ -44,6 +45,17 @@ class Memory:
             raise ValueError(f"Address {address} exceeds the maximum allowed with additional address bits!")
         self.slave_address = (self.slave_address & ~((1 << self.additional_address_bits) - 1) - 1) | (
                     additional_address << 1)
+    
+    def _wait_for_completion(self, request_ids: list[int]) -> None:
+        for rid in request_ids:
+            response = self.interface.wait_for_response(request_id=rid, timeout=0.1, pop_request=True)
+            if response.status_code != I2cStatusCode.SUCCESS:
+                raise ValueError(f"Request {rid} failed with status: {response.status_code}")
+            
+            if response.read_data:
+                # Update the buffer with the read data
+                address = int.from_bytes(response.write_data[:self.address_width.value], 'big')
+                self.buffer[address:address + len(response.read_data)] = response.read_data
 
     def read(self, address: int, length: int) -> bytes:
         if length == -1:
@@ -51,7 +63,8 @@ class Memory:
         if length < 0 or address < 0 or address + length > self.memory_size:
             raise ValueError("Invalid address or length for read operation!")
 
-        request_count = length // I2C_MAX_READ_SIZE + 1
+        request_count = math.ceil(length / I2C_MAX_READ_SIZE)
+        pending_rids = []
         for i in range(request_count):
             offset = i * I2C_MAX_READ_SIZE
             current_address = address + offset
@@ -66,12 +79,16 @@ class Memory:
                 write_data=address_bytes,
                 read_size=read_length
             )
-            rid = self.interface.send_request(request=request)
-            response = self.interface.wait_for_response(request_id=rid, timeout=0.1)
-            if response.status_code != I2cStatusCode.SUCCESS:
-                raise ValueError(f"Failed to read from memory at address {current_address}: {response.status_code}")
-
-            self.buffer[current_address:current_address + read_length] = response.read_data
+            if self.interface.can_accept_request(request=request):
+                rid = self.interface.send_request(request=request)
+                pending_rids.append(rid)
+                continue
+            else:
+                self._wait_for_completion(pending_rids)
+                pending_rids.clear()
+        
+        self._wait_for_completion(pending_rids)
+        pending_rids.clear()
 
         return bytes(self.buffer[address:address + length])
 
@@ -113,12 +130,13 @@ class Memory:
     def _flush_section(self, section_start: int, section_end: int) -> None:
         address = section_start
         length = section_end - section_start
-        request_count = length // (I2C_MAX_WRITE_SIZE - self.address_width.value) + 1
+        max_write_length = I2C_MAX_WRITE_SIZE - self.address_width.value
+        request_count = math.ceil(length / max_write_length)
 
         for i in range(request_count):
-            offset = i * I2C_MAX_WRITE_SIZE
+            offset = i * max_write_length
             current_address = address + offset
-            write_length = min(I2C_MAX_WRITE_SIZE - self.address_width.value, length - offset)
+            write_length = min(max_write_length, length - offset)
             data = self.buffer[current_address:current_address + write_length]
 
             address_bytes = current_address.to_bytes(self.address_width.value, 'big')
@@ -137,7 +155,7 @@ class Memory:
                 read_size=0
             )
             rid = self.interface.send_request(request=request)
-            response = self.interface.wait_for_response(request_id=rid, timeout=0.1)
+            response = self.interface.wait_for_response(request_id=rid, timeout=0.1, pop_request=True)
 
             if response.status_code == I2cStatusCode.SUCCESS:
                 break

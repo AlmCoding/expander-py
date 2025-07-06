@@ -17,6 +17,7 @@ if __name__ == "__main__":
     # Read write to memory
     data = mem.read(address=0, length=42)
     mem.write(address=0, data=data)
+    mem.flush()
 
     # Download and upload binary and hex files
     mem.download_bin_file(0, r"littlefs_image.bin")  # mem -> file

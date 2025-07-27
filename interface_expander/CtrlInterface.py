@@ -19,13 +19,13 @@ class CtrlInterface(metaclass=Singleton):
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_CTRL.value, msg_bytes, 0)
 
     def _receive_msg_cb(self, msg: ctrl_pb2.CtrlMsg):
-        """Receive a control message from the USB interface."""
+        """Receive a CTRL message from the USB interface."""
         if msg.sequence_number < self.sequence_number:
             return
 
 
 def _receive_ctrl_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:
-    """Receive a control message from the USB interface."""
+    """Receive a CTRL message from the USB interface."""
     msg = ctrl_pb2.CtrlMsg()
     msg.ParseFromString(tf_msg.data)
     CtrlInterface()._receive_msg_cb(msg)

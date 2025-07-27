@@ -1,3 +1,4 @@
+from __future__ import annotations
 from interface_expander.proto.proto_py import i2c_pb2
 from enum import Enum
 from typing import Callable
@@ -18,7 +19,7 @@ class I2cId(Enum):
     I2C1 = 1
 
 
-I2C_INSTANCE = {
+I2C_INSTANCE: dict[I2cId, I2cInterface | None] = {
     I2cId.I2C0: None,
     I2cId.I2C1: None
 }
@@ -39,6 +40,18 @@ class AddressWidth(Enum):
     Bits16 = 3
 
 
+class I2cConfigStatusCode(Enum):
+    NOT_INIT = 0
+    SUCCESS = 1
+    BAD_REQUEST = 2
+    INVALID_CLOCK_FREQ = 3
+    INVALID_SLAVE_ADDR = 4
+    INVALID_SLAVE_ADDR_WIDTH = 5
+    INVALID_MEM_ADDR_WIDTH = 6
+    INTERFACE_ERROR = 7
+    PENDING = 8  # Not part of proto enum
+
+
 class I2cStatusCode(Enum):
     NOT_INIT = 0
     SUCCESS = 1
@@ -53,7 +66,7 @@ class I2cStatusCode(Enum):
 class I2cConfig:
     def __init__(self, clock_freq: ClockFreq, slave_addr: int,
                  slave_addr_width: AddressWidth, mem_addr_width: AddressWidth = AddressWidth.Bits16):
-        self.status_code = I2cStatusCode.NOT_INIT
+        self.status_code = I2cConfigStatusCode.NOT_INIT
         self.request_id = None
         self.clock_freq = clock_freq
         self.slave_addr = slave_addr
@@ -118,7 +131,9 @@ class I2cInterface:
         global I2C_INSTANCE
         I2C_INSTANCE[self.i2c_id] = self
 
-        self.apply_config(config)
+        if self.apply_config(config) != I2cConfigStatusCode.SUCCESS:
+            print("Failed to apply I2C configuration: %s" % config.status_code.name)
+            raise RuntimeError("Failed to apply I2C configuration!")
 
     def __del__(self):
         global I2C_INSTANCE
@@ -140,13 +155,28 @@ class I2cInterface:
             elif self.master_buffer_space2 >= (len(request.write_data) + request.read_size):
                 accept = True
 
-            # if accept:
-            #    print("Accept master request ok (sp1: %d, sp2: %d)" %
-            #          (self.master_buffer_space1, self.master_buffer_space2))
-
         elif isinstance(request, I2cSlaveRequest) and self.slave_queue_space > 0:
             accept = True
+        elif isinstance(request, I2cConfig):
+            accept = True
+        else:
+            raise ValueError("Invalid request type: {}".format(type(request)))
 
+        """
+        if isinstance(request, I2cMasterRequest):
+            if accept:
+                print("Accept master request (sp1: %d, sp2: %d, qspace: %d)" %
+                      (self.master_buffer_space1, self.master_buffer_space2, self.master_queue_space))
+            else:
+                print("Cannot accept master request (sp1: %d, sp2: %d, qspace: %d)" %
+                      (self.master_buffer_space1, self.master_buffer_space2, self.master_queue_space))
+        elif isinstance(request, I2cSlaveRequest):
+            if accept:
+                print("Accept slave request (qspace: %d)" % self.slave_queue_space)
+            else:
+                print("Cannot accept slave request (qspace: %d)" % self.slave_queue_space)
+        """
+        
         return accept
 
     def _update_free_space(self, request) -> None:
@@ -224,7 +254,7 @@ class I2cInterface:
             self.slave_access_notifications.clear()
         return notifications
 
-    def apply_config(self, config: I2cConfig, timeout: float = 1.0) -> I2cStatusCode:
+    def apply_config(self, config: I2cConfig, timeout: float = 1.0) -> I2cConfigStatusCode:
         if not isinstance(config, I2cConfig):
             raise ValueError("Invalid configuration!")
         if config.slave_addr_width != AddressWidth.Bits7 and config.slave_addr_width != AddressWidth.Bits10:
@@ -235,7 +265,7 @@ class I2cInterface:
         self.sequence_number += 1
         self.request_id_counter += 1
 
-        config.status_code = I2cStatusCode.PENDING
+        config.status_code = I2cConfigStatusCode.PENDING
         config.request_id = self.request_id_counter
         self.config = config
 
@@ -248,7 +278,6 @@ class I2cInterface:
         msg.config_request.slave_addr = config.slave_addr
         msg.config_request.slave_addr_width = i2c_pb2.AddressWidth.Bits7 if config.slave_addr_width == AddressWidth.Bits7 else i2c_pb2.AddressWidth.Bits10
         msg.config_request.mem_addr_width = i2c_pb2.AddressWidth.Bits8 if config.mem_addr_width == AddressWidth.Bits8 else i2c_pb2.AddressWidth.Bits16
-        msg.config_request.pullups_enabled = True
 
         msg_bytes = msg.SerializeToString()
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_I2C.value, msg_bytes, 0)
@@ -348,19 +377,22 @@ class I2cInterface:
         if request_id in self.master_requests.keys():
             container = self.master_requests
             request = container[request_id]
+            pending_code = I2cStatusCode.PENDING
         elif request_id in self.slave_requests.keys():
             container = self.slave_requests
             request = container[request_id]
+            pending_code = I2cStatusCode.PENDING
         elif self.config.request_id == request_id:
             container = None
             request = self.config
+            pending_code = I2cConfigStatusCode.PENDING
         else:
             raise ValueError("Unknown request id (id: %d)" % request_id)
 
         start_time = time.time()
         while True:
             intexp.InterfaceExpander()._read_all()
-            if request.status_code != I2cStatusCode.PENDING:
+            if request.status_code != pending_code:
                 break
             elif time.time() - start_time > timeout:
                 raise TimeoutError("Timeout waiting for response (id: %d)" % request_id)
@@ -409,8 +441,9 @@ class I2cInterface:
 
     def _handle_config_status(self, msg: i2c_pb2.I2cMsg):
         if msg.config_status.request_id == self.config.request_id:
-            self.config.status_code = I2cStatusCode(msg.config_status.status_code)
-            # print("Response to config request (id: %d)" % self.config.request_id)
+            self.config.status_code = I2cConfigStatusCode(msg.config_status.status_code)
+        else:
+            raise ValueError("Received config status for unknown request (id: %d)" % msg.config_status.request_id)
 
     def _handle_master_status(self, msg: i2c_pb2.I2cMsg):
         update_space = False
@@ -422,7 +455,8 @@ class I2cInterface:
 
         request_id = msg.master_status.request_id
         if request_id not in self.master_requests.keys():
-            raise Exception("Unknown master(%d) request (id: %d)" % (self.i2c_id.value, request_id))
+            raise ValueError("Unknown master(%d) request (id: %d)" % (self.i2c_id.value, request_id))
+
         """
         if update_space:
             print("Response to master(%d) request (id: %d) | Update (sp1: %d, sp2: %d)" %
@@ -444,7 +478,7 @@ class I2cInterface:
         request_id = msg.slave_status.request_id
 
         if request_id not in self.slave_requests.keys():
-            raise Exception("Unknown slave(%d) request (id: %d)" % (self.i2c_id.value, request_id))
+            raise ValueError("Unknown slave(%d) request status (id: %d) received!" % (self.i2c_id.value, request_id))
         # print("Response to slave(%d) request (id: %d)" % (self.i2c_id.value, request_id))
 
         self.slave_requests[request_id].status_code = I2cStatusCode(msg.slave_status.status_code)
@@ -454,10 +488,13 @@ class I2cInterface:
             request.callback_fn(request)
 
     def _handle_slave_notification(self, msg: i2c_pb2.I2cMsg):
+        if msg.sequence_number >= self.sequence_number:
+            self.slave_queue_space = msg.slave_notification.queue_space
+
         access_id = msg.slave_notification.access_id
 
         if access_id in self.slave_access_notifications.keys():
-            raise Exception("Duplicate slave(%d) access (id: %d)" % (self.i2c_id.value, access_id))
+            raise ValueError("Duplicate slave(%d) access (id: %d)" % (self.i2c_id.value, access_id))
 
         status_code = I2cStatusCode(msg.slave_notification.status_code)
         notification = I2cSlaveNotification(msg.slave_notification.access_id, status_code,
@@ -473,10 +510,11 @@ class I2cInterface:
 
 
 def _receive_i2c_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:
-    global I2C_INSTANCE
+    """Receive a I2C message from the USB interface."""
     msg = i2c_pb2.I2cMsg()
     msg.ParseFromString(bytes(tf_msg.data))
 
+    global I2C_INSTANCE
     if msg.i2c_id == i2c_pb2.I2cId.I2C0:
         instance = I2C_INSTANCE[I2cId.I2C0]
     else:
@@ -484,6 +522,8 @@ def _receive_i2c_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:
 
     if instance is not None:
         instance._receive_msg_cb(msg)
+    else:
+        raise RuntimeError("I2C instance (id: %s) is not initialized!" % msg.i2c_id.name)
 
 
 tf.tf_register_callback(tf.TfMsgType.TYPE_I2C, _receive_i2c_msg_cb)

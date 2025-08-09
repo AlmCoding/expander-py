@@ -2,6 +2,7 @@ from interface_expander.InterfaceExpander import InterfaceExpander
 from interface_expander.I2cInterface import I2cInterface, I2cConfig, ClockFreq, AddressWidth, I2cId
 from interface_expander.Memory import Memory, MemoryType, MemoryAddressWidth
 
+
 if __name__ == "__main__":
     expander = InterfaceExpander()
     expander.connect()

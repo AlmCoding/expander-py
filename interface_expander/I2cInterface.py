@@ -139,8 +139,26 @@ class I2cInterface:
         global I2C_INSTANCE
         if I2C_INSTANCE and I2C_INSTANCE[self.i2c_id] is self:
             I2C_INSTANCE[self.i2c_id] = None
+            
+    def _check_request_sanity(self, request: I2cMasterRequest | I2cSlaveRequest) -> None:
+        if isinstance(request, I2cMasterRequest):
+            if request.slave_addr == self.config.slave_addr:
+                raise ValueError("Slave address in request collides with own slave address!")
+            if len(request.write_data) == 0 and request.read_size == 0:
+                raise ValueError("Write and read data cannot both be empty!")
+            if len(request.write_data) > I2C_MAX_WRITE_SIZE or request.read_size > I2C_MAX_READ_SIZE:
+                raise ValueError("Write/read data size exceeds maximum allowed (%d)" % I2C_MAX_WRITE_SIZE)
+            
+        elif isinstance(request, I2cSlaveRequest):
+            if len(request.write_data) == 0 and request.read_size == 0:
+                raise ValueError("Write and read data cannot both be empty!")
+            if len(request.write_data) > I2C_MAX_WRITE_SIZE or request.read_size > I2C_MAX_READ_SIZE:
+                raise ValueError("Write/read data size exceeds maximum allowed (%d)" % I2C_MAX_WRITE_SIZE)
+        else:
+            raise ValueError("Invalid request type: {}".format(type(request)))
 
-    def can_accept_request(self, request) -> bool:
+    def can_accept_request(self, request: I2cMasterRequest | I2cSlaveRequest) -> bool:
+        self._check_request_sanity(request)
         accept = False
 
         if isinstance(request, I2cMasterRequest) and self.master_queue_space > 0:
@@ -254,7 +272,7 @@ class I2cInterface:
             self.slave_access_notifications.clear()
         return notifications
 
-    def apply_config(self, config: I2cConfig, timeout: float = 1.0) -> I2cConfigStatusCode:
+    def apply_config(self, config: I2cConfig, timeout: float = 0.1) -> I2cConfigStatusCode:
         if not isinstance(config, I2cConfig):
             raise ValueError("Invalid configuration!")
         if config.slave_addr_width != AddressWidth.Bits7 and config.slave_addr_width != AddressWidth.Bits10:
@@ -286,8 +304,14 @@ class I2cInterface:
         self.wait_for_response(config.request_id, timeout)
         return config.status_code
 
-    def send_request(self, request: I2cMasterRequest | I2cSlaveRequest) -> int:
-        intexp.InterfaceExpander()._read_all()
+    def send_request(self, request: I2cMasterRequest | I2cSlaveRequest, timeout: float = 0.1) -> int:
+        start_time = time.time()
+        while True:
+            intexp.InterfaceExpander()._read_all()
+            if self.can_accept_request(request):
+                break
+            elif time.time() - start_time > timeout:
+                raise TimeoutError("Timeout waiting for request acceptance!")
 
         if isinstance(request, I2cMasterRequest):
             return self._send_master_request(request)
@@ -300,6 +324,7 @@ class I2cInterface:
         if not isinstance(request, I2cMasterRequest):
             raise ValueError("Invalid request type!")
 
+        """
         if request.slave_addr == self.config.slave_addr:
             raise ValueError("Slave address in request collides with own slave address!")
 
@@ -308,9 +333,7 @@ class I2cInterface:
 
         if len(request.write_data) > I2C_MAX_WRITE_SIZE or request.read_size > I2C_MAX_READ_SIZE:
             raise ValueError("Write/read data size exceeds maximum allowed (%d)" % I2C_MAX_WRITE_SIZE)
-
-        if not self.can_accept_request(request):
-            return -1
+        """
 
         self.sequence_number += 1
         self.request_id_counter += 1
@@ -340,14 +363,13 @@ class I2cInterface:
         if not isinstance(request, I2cSlaveRequest):
             raise Exception("Invalid request type!")
 
+        """
         if len(request.write_data) == 0 and request.read_size == 0:
             raise ValueError("Write and read data cannot both be empty!")
 
         if len(request.write_data) > I2C_MAX_WRITE_SIZE or request.read_size > I2C_MAX_READ_SIZE:
             raise ValueError("Write/read data size exceeds maximum allowed (%d)" % I2C_MAX_WRITE_SIZE)
-
-        if not self.can_accept_request(request):
-            return -1
+        """
 
         self.sequence_number += 1
         self.request_id_counter += 1
@@ -446,24 +468,14 @@ class I2cInterface:
             raise ValueError("Received config status for unknown request (id: %d)" % msg.config_status.request_id)
 
     def _handle_master_status(self, msg: i2c_pb2.I2cMsg):
-        update_space = False
         if msg.sequence_number >= self.sequence_number:
             self.master_queue_space = msg.master_status.queue_space
             self.master_buffer_space1 = msg.master_status.buffer_space1
             self.master_buffer_space2 = msg.master_status.buffer_space2
-            update_space = True
 
         request_id = msg.master_status.request_id
         if request_id not in self.master_requests.keys():
             raise ValueError("Unknown master(%d) request (id: %d)" % (self.i2c_id.value, request_id))
-
-        """
-        if update_space:
-            print("Response to master(%d) request (id: %d) | Update (sp1: %d, sp2: %d)" %
-                  (self.i2c_id.value, request_id, self.master_buffer_space1, self.master_buffer_space2))
-        else:
-            print("Response to master(%d) request (id: %d)" % (self.i2c_id.value, request_id))
-        """
 
         self.master_requests[request_id].status_code = I2cStatusCode(msg.master_status.status_code)
         self.master_requests[request_id].read_data = msg.master_status.read_data
@@ -476,10 +488,8 @@ class I2cInterface:
             self.slave_queue_space = msg.slave_status.queue_space
 
         request_id = msg.slave_status.request_id
-
         if request_id not in self.slave_requests.keys():
             raise ValueError("Unknown slave(%d) request status (id: %d) received!" % (self.i2c_id.value, request_id))
-        # print("Response to slave(%d) request (id: %d)" % (self.i2c_id.value, request_id))
 
         self.slave_requests[request_id].status_code = I2cStatusCode(msg.slave_status.status_code)
         self.slave_requests[request_id].read_data = msg.slave_status.read_data

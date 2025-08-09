@@ -10,11 +10,22 @@ if __name__ == "__main__":
 
     dac = DigitalToAnalog()
 
-    # dac.output_value(value_ch1=DAC_MAX_SAMPLE_VALUE // 2, value_ch2=DAC_MAX_SAMPLE_VALUE // 4)
-    #dac.loop_sequence(sequence_ch1=[1,2,3,4,5,6,7], sequence_ch2=[1,2,3,4,5,6,7], sampling_rate=1000)
+    dac.output_voltage(voltage_ch0=0.0, voltage_ch1=0.0)
+    dac.output_voltage(voltage_ch0=10, voltage_ch1=10)
+    dac.output_voltage(voltage_ch0=-10, voltage_ch1=-10)
 
-    sample_count = 100 # DAC_MAX_SAMPLE_BUFFER_SPACE
-    sin_sequence = [int((math.sin(i * 2 * math.pi / sample_count) + 1) / 2 * DAC_MAX_SAMPLE_VALUE) for i in range(sample_count)]
+    dac.output_value(value_ch0=DAC_MAX_SAMPLE_VALUE // 10, value_ch1=DAC_MAX_SAMPLE_VALUE // 10)
+
+    dac.output_value(value_ch0=DAC_MAX_SAMPLE_VALUE // 4, value_ch1=None)
+    dac.output_value(value_ch0=None, value_ch1=0)
+    dac.output_value(value_ch0=DAC_MAX_SAMPLE_VALUE // 2, value_ch1=DAC_MAX_SAMPLE_VALUE // 2)
+    dac.output_value(value_ch0=0, value_ch1=0)
+    dac.output_value(value_ch0=DAC_MAX_SAMPLE_VALUE, value_ch1=DAC_MAX_SAMPLE_VALUE)
+
+    # dac.loop_sequence(sequence_ch1=[1,2,3,4,5,6,7], sequence_ch2=[1,2,3,4,5,6,7], sampling_rate=1000)
+
+    #sample_count = 424 # DAC_MAX_SAMPLE_BUFFER_SPACE
+    #sin_sequence = [int((math.sin(i * 2 * math.pi / sample_count) + 1) / 2 * DAC_MAX_SAMPLE_VALUE) for i in range(sample_count)]
     """
     # Plot the sequence
     plt.figure(figsize=(12, 6))
@@ -28,8 +39,7 @@ if __name__ == "__main__":
     plt.show()
     """
 
-    dac.loop_sequence(sequence_ch1=sin_sequence, sequence_ch2=sin_sequence, sampling_rate=1000)
-    print("Loop sequence set successfully.")
+    #dac.loop_sequence(sequence_ch1=sin_sequence, sequence_ch2=sin_sequence, sampling_rate=1000)
 
     expander.disconnect()
     

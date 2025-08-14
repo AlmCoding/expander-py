@@ -9,14 +9,14 @@ from tests.helper import generate_master_write_read_requests, i2c_send_request, 
 
 
 class TestI2cMaster:
-    REQUEST_COUNT = 4 * 1000
+    REQUEST_COUNT = 4 * 2000
     DATA_SIZE_MIN = 1
     DATA_SIZE_MAX = 128
 
     I2C_CLOCK_FREQ = ClockFreq.FREQ400K
     I2C0_SLAVE_ADDR = 0x01
     I2C1_SLAVE_ADDR = 0x02
-    FRAM_SLAVE_ADDR = 0x50
+    FRAM_SLAVE_ADDR = 0x51
 
     FRAM_SIZE = 32768  # (== 2^15)
     FRAM_0_MIN_ADDR = 0
@@ -55,11 +55,12 @@ class TestI2cMaster:
                                                                  max_size=TestI2cMaster.DATA_SIZE_MAX,
                                                                  count=TestI2cMaster.REQUEST_COUNT // 4)
 
-        while len(requests_pipeline0) > 0 or len(requests_pipeline1) > 0:
+        while len(requests_pipeline0) > 0:
             rid = i2c_send_request(i2c0, requests_pipeline0)
             i2c0.wait_for_response(request_id=rid, timeout=0.1)
             verify_master_write_read_requests(i2c0)
 
+        while  len(requests_pipeline1) > 0:
             rid = i2c_send_request(i2c1, requests_pipeline1)
             i2c1.wait_for_response(request_id=rid, timeout=0.1)
             verify_master_write_read_requests(i2c1)

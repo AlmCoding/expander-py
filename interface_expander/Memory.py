@@ -38,24 +38,58 @@ class Memory:
         self.buffer = bytearray(self.memory_size)
         self.updated_sections = []
 
-    def _pack_slave_address(self, address: int) -> None:
+    def _pack_slave_address(self, address: int) -> int:
         # Pack the additional address bits into the slave address byte (used by some FRAMs/EEPROMs)
+        if self.additional_address_bits == 0:
+            return address
+
         additional_address = address >> (self.address_width.value * 8)
         if additional_address.bit_length() > self.additional_address_bits:
             raise ValueError(f"Address {address} exceeds the maximum allowed with additional address bits!")
-        self.slave_address = (self.slave_address & ~((1 << self.additional_address_bits) - 1) - 1) | (
-                    additional_address << 1)
+        
+        slave_mask = ~((1 << self.additional_address_bits) - 1)
+        new_address = (self.slave_address & slave_mask) | additional_address
+        self.slave_address = new_address
+
+        max_value = (1 << (self.address_width.value * 8)) - 1
+        masked_address = address & max_value
+        return masked_address # Does not exceed the address width (additional bits are packed into the slave address)
     
-    def _wait_for_completion(self, request_ids: list[int]) -> None:
+    def _unpack_slave_address(self, masked_address: int) -> int:
+        # Unpack the additional address bits from the slave address byte
+        if self.additional_address_bits == 0:
+            return masked_address
+
+        address_mask = ((1 << self.additional_address_bits) - 1)
+        additional_address = (self.slave_address & address_mask) << (self.address_width.value * 8)
+        address = masked_address | additional_address
+        return address # Restores the full address including additional bits
+
+    def _wait_for_completion(self, request_ids: list[int], recursion: int = 0) -> None:
+        max_repetitions = 10 # Maximum number of retries for read requests
+        failed_requests = []
+
         for rid in request_ids:
             response = self.interface.wait_for_response(request_id=rid, timeout=0.1, pop_request=True)
-            if response.status_code != I2cStatusCode.SUCCESS:
+            if response.status_code == I2cStatusCode.SLAVE_NO_ACK and recursion < max_repetitions:
+                failed_requests.append(response)
+            elif response.status_code == I2cStatusCode.SUCCESS:
+                if response.read_data:
+                    # Update the buffer with the read data
+                    masked_address = int.from_bytes(response.write_data[:self.address_width.value], 'big')
+                    address = self._unpack_slave_address(masked_address)
+                    self.buffer[address:address + len(response.read_data)] = response.read_data
+            else:
                 raise ValueError(f"Request {rid} failed with status: {response.status_code}")
-            
-            if response.read_data:
-                # Update the buffer with the read data
-                address = int.from_bytes(response.write_data[:self.address_width.value], 'big')
-                self.buffer[address:address + len(response.read_data)] = response.read_data
+        request_ids.clear()
+        
+        # Retry any requests that failed due to no ACK
+        for request in failed_requests:
+            rid = self.interface.send_request(request=request)
+            request_ids.append(rid)
+
+        if failed_requests:
+            self._wait_for_completion(request_ids, recursion + 1)
 
     def read(self, address: int, length: int) -> bytes:
         if length == -1:
@@ -70,26 +104,18 @@ class Memory:
             current_address = address + offset
             read_length = min(I2C_MAX_READ_SIZE, length - offset)
 
-            address_bytes = current_address.to_bytes(self.address_width.value, 'big')
-            if self.additional_address_bits > 0:
-                self._pack_slave_address(current_address)  # Part of the address is in the slave address byte
+            masked_addr = self._pack_slave_address(current_address)
+            address_bytes = masked_addr.to_bytes(self.address_width.value, 'big')
 
             request = I2cMasterRequest(
                 slave_addr=self.slave_address,
                 write_data=address_bytes,
                 read_size=read_length
             )
-            if self.interface.can_accept_request(request=request):
-                rid = self.interface.send_request(request=request)
-                pending_rids.append(rid)
-                continue
-            else:
-                self._wait_for_completion(pending_rids)
-                pending_rids.clear()
-        
-        self._wait_for_completion(pending_rids)
-        pending_rids.clear()
+            rid = self.interface.send_request(request=request)
+            pending_rids.append(rid)
 
+        self._wait_for_completion(pending_rids)
         return bytes(self.buffer[address:address + length])
 
     def write(self, address: int, data: bytes) -> None:
@@ -122,31 +148,36 @@ class Memory:
         for section_start, section_end in self.updated_sections:
             if section_start < 0 or section_end > self.memory_size:
                 raise ValueError("Invalid section range for flush operation!")
-
             self._flush_section(section_start, section_end)
-
         self.updated_sections.clear()
 
     def _flush_section(self, section_start: int, section_end: int) -> None:
         address = section_start
         length = section_end - section_start
+        first_page = address // self.page_size
+        last_page = (address + length - 1) // self.page_size
+        page_count = last_page - first_page + 1
         max_write_length = I2C_MAX_WRITE_SIZE - self.address_width.value
-        request_count = math.ceil(length / max_write_length)
 
-        for i in range(request_count):
-            offset = i * max_write_length
-            current_address = address + offset
-            write_length = min(max_write_length, length - offset)
-            data = self.buffer[current_address:current_address + write_length]
+        current_address = address
+        page_start = first_page * self.page_size
+        for _ in range(page_count):
+            page_end = page_start + self.page_size
 
-            address_bytes = current_address.to_bytes(self.address_width.value, 'big')
-            if self.additional_address_bits > 0:
-                self._pack_slave_address(current_address)  # Part of the address is in the slave address byte
+            while current_address < page_end and current_address < section_end:
+                write_length = min(max_write_length, page_end - current_address, section_end - current_address)
+                data = self.buffer[current_address:current_address + write_length]
+                
+                masked_addr = self._pack_slave_address(current_address)
+                address_bytes = masked_addr.to_bytes(self.address_width.value, 'big')
 
-            self._send_write_request(address_bytes + data)
+                self._send_write_request(address_bytes + data)
+                current_address += write_length
+ 
+            page_start += self.page_size
 
     def _send_write_request(self, write_data: bytes) -> None:
-        max_retries = 100
+        max_retries = 42
         retry_counter = 0
         while retry_counter < max_retries:
             request = I2cMasterRequest(
@@ -175,9 +206,9 @@ class Memory:
             self.write(address, data)
             self.flush()
 
-    def download_bin_file(self, address: int, file_path: str) -> None:
+    def download_bin_file(self, address: int, file_path: str, size: int = -1) -> None:
         # Read data from memory and save to file
-        data = self.read(address, -1)
+        data = self.read(address, size)
         with open(file_path, 'wb') as file:
             file.write(data)
 
@@ -188,9 +219,9 @@ class Memory:
             self.write(address, bytes([data]))
         self.flush()
 
-    def download_hex_file(self, address: int, file_path: str) -> None:
+    def download_hex_file(self, address: int, file_path: str, size: int = -1) -> None:
         # Read data from memory and save to hex file
         ih = IntelHex()
-        data = self.read(address, -1)
+        data = self.read(address, size)
         ih.frombytes(data, offset=address)
         ih.tofile(file_path, format='hex')

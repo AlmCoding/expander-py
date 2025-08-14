@@ -13,7 +13,7 @@ from tests.helper import (generate_slave_config_requests,
 
 
 class TestI2cMasterSlave:
-    REQUEST_COUNT = 4 * 1000
+    REQUEST_COUNT = 4 * 2000
     DATA_SIZE_MIN = 1
     DATA_SIZE_MAX = 128
 

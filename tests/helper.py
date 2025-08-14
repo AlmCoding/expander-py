@@ -115,6 +115,12 @@ def verify_master_write_read_requests(i2c_int: I2cInterface) -> list[I2cMasterRe
             assert len(request.write_data) > 0
             previous_write_request = request
         else:  # Read request
-            assert len(request.write_data) == 2
+            if request.read_data != previous_write_request.write_data[2:]:
+                print("Read data does not match write data for request id: {} \n\tW-data: {} ({})\n\tR-data: {} ({})"
+                      .format(request.request_id, previous_write_request.write_data[2:], len(previous_write_request.write_data[2:]),
+                              request.read_data, len(request.read_data)))
+            
+            assert len(request.write_data) == 2 # Address size
+            assert len(request.read_data) == len(previous_write_request.write_data[2:])
             assert request.read_data == previous_write_request.write_data[2:]
     return complete_requests

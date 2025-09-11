@@ -1,4 +1,5 @@
 import time
+
 # import threading
 import serial.tools.list_ports
 from interface_expander.tiny_frame import tf_init
@@ -21,9 +22,11 @@ class InterfaceExpander(metaclass=Singleton):
     def _get_port_name() -> str:
         com_ports = serial.tools.list_ports.comports()
         for com_port in com_ports:
-            if (com_port.vid in InterfaceExpander.VendorIds and
-                    com_port.pid in InterfaceExpander.ProductIds and
-                    com_port.serial_number in InterfaceExpander.SerialNumbers):
+            if (
+                com_port.vid in InterfaceExpander.VendorIds
+                and com_port.pid in InterfaceExpander.ProductIds
+                and com_port.serial_number in InterfaceExpander.SerialNumbers
+            ):
                 return com_port.device
         raise Exception("No valid Serial Port found!")
 

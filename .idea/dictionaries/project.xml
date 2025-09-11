@@ -2,6 +2,8 @@
   <dictionary name="project">
     <words>
       <w>littlefs</w>
+      <w>opamp</w>
+      <w>vref</w>
     </words>
   </dictionary>
 </component>

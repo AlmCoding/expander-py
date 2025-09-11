@@ -1,0 +1,18 @@
+{
+    // JSON files: no formatting
+    "[json]": {
+        "editor.defaultFormatter": "vscode.json-language-features",
+        "editor.formatOnSave": false
+    },
+    // Python files: use Black as the formatter
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true
+    },
+    // Optional: make sure Black is enabled
+    "python.formatting.provider": "none" // disables old provider, Black handles formatting
+    // Black configuration
+    "black-formatter.args": [
+        "--line-length=120"
+    ]
+}

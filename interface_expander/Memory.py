@@ -1,5 +1,10 @@
-from interface_expander.I2cInterface import I2cInterface, I2cMasterRequest, I2cStatusCode, I2C_MAX_READ_SIZE, \
-    I2C_MAX_WRITE_SIZE
+from interface_expander.I2cInterface import (
+    I2cInterface,
+    I2cMasterRequest,
+    I2cStatusCode,
+    I2C_MAX_READ_SIZE,
+    I2C_MAX_WRITE_SIZE,
+)
 from intelhex import IntelHex
 from enum import Enum
 import math
@@ -19,8 +24,15 @@ class MemoryAddressWidth(Enum):
 
 
 class Memory:
-    def __init__(self, interface: I2cInterface, slave_address: int, memory_type: MemoryType,
-                 address_width: MemoryAddressWidth, page_count: int, page_size: int):
+    def __init__(
+        self,
+        interface: I2cInterface,
+        slave_address: int,
+        memory_type: MemoryType,
+        address_width: MemoryAddressWidth,
+        page_count: int,
+        page_size: int,
+    ):
         self.interface = interface
         self.slave_address = slave_address
         self.memory_type = memory_type
@@ -46,27 +58,27 @@ class Memory:
         additional_address = address >> (self.address_width.value * 8)
         if additional_address.bit_length() > self.additional_address_bits:
             raise ValueError(f"Address {address} exceeds the maximum allowed with additional address bits!")
-        
+
         slave_mask = ~((1 << self.additional_address_bits) - 1)
         new_address = (self.slave_address & slave_mask) | additional_address
         self.slave_address = new_address
 
         max_value = (1 << (self.address_width.value * 8)) - 1
         masked_address = address & max_value
-        return masked_address # Does not exceed the address width (additional bits are packed into the slave address)
-    
+        return masked_address  # Does not exceed the address width (additional bits are packed into the slave address)
+
     def _unpack_slave_address(self, masked_address: int) -> int:
         # Unpack the additional address bits from the slave address byte
         if self.additional_address_bits == 0:
             return masked_address
 
-        address_mask = ((1 << self.additional_address_bits) - 1)
+        address_mask = (1 << self.additional_address_bits) - 1
         additional_address = (self.slave_address & address_mask) << (self.address_width.value * 8)
         address = masked_address | additional_address
-        return address # Restores the full address including additional bits
+        return address  # Restores the full address including additional bits
 
     def _wait_for_completion(self, request_ids: list[int], recursion: int = 0) -> None:
-        max_repetitions = 10 # Maximum number of retries for read requests
+        max_repetitions = 10  # Maximum number of retries for read requests
         failed_requests = []
 
         for rid in request_ids:
@@ -76,13 +88,13 @@ class Memory:
             elif response.status_code == I2cStatusCode.SUCCESS:
                 if response.read_data:
                     # Update the buffer with the read data
-                    masked_address = int.from_bytes(response.write_data[:self.address_width.value], 'big')
+                    masked_address = int.from_bytes(response.write_data[: self.address_width.value], "big")
                     address = self._unpack_slave_address(masked_address)
-                    self.buffer[address:address + len(response.read_data)] = response.read_data
+                    self.buffer[address : address + len(response.read_data)] = response.read_data
             else:
                 raise ValueError(f"Request {rid} failed with status: {response.status_code}")
         request_ids.clear()
-        
+
         # Retry any requests that failed due to no ACK
         for request in failed_requests:
             rid = self.interface.send_request(request=request)
@@ -105,24 +117,20 @@ class Memory:
             read_length = min(I2C_MAX_READ_SIZE, length - offset)
 
             masked_addr = self._pack_slave_address(current_address)
-            address_bytes = masked_addr.to_bytes(self.address_width.value, 'big')
+            address_bytes = masked_addr.to_bytes(self.address_width.value, "big")
 
-            request = I2cMasterRequest(
-                slave_addr=self.slave_address,
-                write_data=address_bytes,
-                read_size=read_length
-            )
+            request = I2cMasterRequest(slave_addr=self.slave_address, write_data=address_bytes, read_size=read_length)
             rid = self.interface.send_request(request=request)
             pending_rids.append(rid)
 
         self._wait_for_completion(pending_rids)
-        return bytes(self.buffer[address:address + length])
+        return bytes(self.buffer[address : address + length])
 
     def write(self, address: int, data: bytes) -> None:
         if address < 0 or address + len(data) > self.memory_size:
             raise ValueError("Invalid address or data length for write operation!")
 
-        self.buffer[address:address + len(data)] = data
+        self.buffer[address : address + len(data)] = data
 
         section_start = address
         section_end = address + len(data)
@@ -166,25 +174,21 @@ class Memory:
 
             while current_address < page_end and current_address < section_end:
                 write_length = min(max_write_length, page_end - current_address, section_end - current_address)
-                data = self.buffer[current_address:current_address + write_length]
-                
+                data = self.buffer[current_address : current_address + write_length]
+
                 masked_addr = self._pack_slave_address(current_address)
-                address_bytes = masked_addr.to_bytes(self.address_width.value, 'big')
+                address_bytes = masked_addr.to_bytes(self.address_width.value, "big")
 
                 self._send_write_request(address_bytes + data)
                 current_address += write_length
- 
+
             page_start += self.page_size
 
     def _send_write_request(self, write_data: bytes) -> None:
         max_retries = 42
         retry_counter = 0
         while retry_counter < max_retries:
-            request = I2cMasterRequest(
-                slave_addr=self.slave_address,
-                write_data=write_data,
-                read_size=0
-            )
+            request = I2cMasterRequest(slave_addr=self.slave_address, write_data=write_data, read_size=0)
             rid = self.interface.send_request(request=request)
             response = self.interface.wait_for_response(request_id=rid, timeout=0.1, pop_request=True)
 
@@ -201,7 +205,7 @@ class Memory:
 
     def upload_bin_file(self, address: int, file_path: str) -> None:
         # Read data from file and write to memory
-        with open(file_path, 'rb') as file:
+        with open(file_path, "rb") as file:
             data = file.read()
             self.write(address, data)
             self.flush()
@@ -209,7 +213,7 @@ class Memory:
     def download_bin_file(self, address: int, file_path: str, size: int = -1) -> None:
         # Read data from memory and save to file
         data = self.read(address, size)
-        with open(file_path, 'wb') as file:
+        with open(file_path, "wb") as file:
             file.write(data)
 
     def upload_hex_file(self, file_path: str) -> None:
@@ -224,4 +228,4 @@ class Memory:
         ih = IntelHex()
         data = self.read(address, size)
         ih.frombytes(data, offset=address)
-        ih.tofile(file_path, format='hex')
+        ih.tofile(file_path, format="hex")

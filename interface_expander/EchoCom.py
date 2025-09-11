@@ -6,6 +6,7 @@ from interface_expander.Singleton import Singleton
 
 class EchoCom(metaclass=Singleton):
     def __init__(self):
+        self.expander = intexp.InterfaceExpander()
         self.received_data = None
 
     def send(self, data: bytes) -> None:
@@ -15,12 +16,12 @@ class EchoCom(metaclass=Singleton):
 
     def read_echo(self, timeout: float):
         """Wait for an echo message from the USB interface."""
-        start_time = time.time()
+        start_time = time.monotonic()
         while True:
-            intexp.InterfaceExpander()._read_all()
+            self.expander._read_all()
             if self.received_data:
                 break
-            elif time.time() - start_time > timeout:
+            elif time.monotonic() - start_time > timeout:
                 raise TimeoutError("Timeout waiting for echo message!")
 
         return self.received_data

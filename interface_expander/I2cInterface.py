@@ -338,6 +338,8 @@ class I2cInterface:
             self.expander._read_all()
             if time.monotonic() - start_time > timeout:
                 raise TimeoutError("Timeout waiting for request acceptance!")
+        else:
+            self.expander._read_all()
 
         if isinstance(request, I2cMasterRequest):
             return self._send_master_request(request)

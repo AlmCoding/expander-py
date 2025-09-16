@@ -7,6 +7,7 @@ import interface_expander.tiny_frame as tf
 import interface_expander.InterfaceExpander as intexp
 import time, math
 
+
 DAC_MAX_QUEUE_SPACE = 4
 DAC_MAX_SAMPLE_BUFFER_SPACE = 1024
 DAC_MAX_DATA_SAMPLES = 128 // 2  # 128 bytes, 2 bytes per sample (16-bit DAC)
@@ -184,7 +185,7 @@ class DigitalToAnalog:
         return config.status_code
 
     @staticmethod
-    def _verify_parameters(mode: DacMode, sequence: iter, sampling_rate: int) -> None:
+    def _verify_parameters(mode: DacMode, sequence: list, sampling_rate: int | None) -> None:
         if mode not in DacMode:
             raise ValueError("Invalid DAC mode: %s" % mode)
 
@@ -208,7 +209,7 @@ class DigitalToAnalog:
                     "Sampling rate out of range (%d to %d)" % (DAC_MIN_SAMPLING_RATE, DAC_MAX_SAMPLING_RATE)
                 )
 
-    def _can_accept_request(self, request) -> bool:
+    def _can_accept_request(self, request: DacDataRequest | DacConfig) -> bool:
         accept = False
 
         if isinstance(request, DacDataRequest):
@@ -222,7 +223,7 @@ class DigitalToAnalog:
 
         if accept:
             print(
-                "Accept request ok (queue_space: %d, buffer_space_ch0: %d, buffer_space_ch1: %d)"
+                "Accept request (queue_space: %d, buffer_space_ch0: %d, buffer_space_ch1: %d)"
                 % (self.queue_space, self.buffer_space_ch0, self.buffer_space_ch1)
             )
 
@@ -273,7 +274,7 @@ class DigitalToAnalog:
         sequence_ch0 = []
         if value_ch0 is not None:
             sequence_ch0 = [value_ch0]
-            DigitalToAnalog._verify_parameters(DacMode.STATIC_MODE, sequence_ch0, None)
+            DigitalToAnalog._verify_parameters(DacMode.STATIC_MODE, sequence_ch0, sampling_rate=None)
             config.mode_ch0 = DacMode.STATIC_MODE
             config.sampling_rate_ch0 = DAC_MIN_SAMPLING_RATE
             config.sample_count_ch0 = 0
@@ -281,7 +282,7 @@ class DigitalToAnalog:
         sequence_ch1 = []
         if value_ch1 is not None:
             sequence_ch1 = [value_ch1]
-            DigitalToAnalog._verify_parameters(DacMode.STATIC_MODE, sequence_ch1, None)
+            DigitalToAnalog._verify_parameters(DacMode.STATIC_MODE, sequence_ch1, sampling_rate=None)
             config.mode_ch1 = DacMode.STATIC_MODE
             config.sampling_rate_ch1 = DAC_MIN_SAMPLING_RATE
             config.sample_count_ch1 = 0
@@ -293,7 +294,7 @@ class DigitalToAnalog:
         rid = self._send_data_request(request)
 
         # Wait for response with timeout
-        self._wait_for_response(rid, 0.1)
+        self._wait_for_response(rid, timeout=0.1)
         return request.status_code
 
     def loop_sequence(
@@ -356,7 +357,7 @@ class DigitalToAnalog:
             self._send_data_request(request)
 
         # Wait for all requests to complete
-        self._wait_for_all_responses(0.1)
+        self._wait_for_all_responses(timeout=0.1)
         return DacDataStatusCode.SUCCESS
 
     def stream_sequence(
@@ -365,7 +366,7 @@ class DigitalToAnalog:
         sampling_rate_ch0: int | None,
         sequence_ch1: list[int] | None,
         sampling_rate_ch1: int | None,
-    ) -> int:
+    ) -> DacDataStatusCode:
         config = copy(self.config)
 
         if sequence_ch0 is None and sequence_ch1 is None:
@@ -393,10 +394,15 @@ class DigitalToAnalog:
 
         timeout = DAC_MAX_DATA_SAMPLES / max(sampling_rate_ch0 or 1, sampling_rate_ch1 or 1)
         while offset_ch0 < len_ch0 or offset_ch1 < len_ch1:
-            if self.buffer_space_ch0 < DAC_MAX_DATA_SAMPLES or self.buffer_space_ch1 < DAC_MAX_DATA_SAMPLES:
-                time.sleep(timeout)
-                self.buffer_space_ch0 += int(sampling_rate_ch0 * timeout)
-                self.buffer_space_ch1 += int(sampling_rate_ch1 * timeout)
+            start_time = time.monotonic()
+            while (
+                self.buffer_space_ch0 < DAC_MAX_DATA_SAMPLES
+                or self.buffer_space_ch1 < DAC_MAX_DATA_SAMPLES
+                or self.queue_space == 0
+            ):
+                self._wait_for_all_responses(timeout=0.1)
+                if time.monotonic() - start_time > timeout + 0.1:
+                    raise TimeoutError("Timeout waiting for buffer space!")
 
             current_sequence_ch0 = []
             if offset_ch0 < len_ch0:
@@ -407,14 +413,15 @@ class DigitalToAnalog:
             current_sequence_ch1 = []
             if offset_ch1 < len_ch1:
                 length = min(DAC_MAX_DATA_SAMPLES, len_ch1 - offset_ch1, self.buffer_space_ch1)
-                current_sequence_ch1 = sequence_ch1[offset_ch1, offset_ch1 + length]
+                current_sequence_ch1 = sequence_ch1[offset_ch1 : offset_ch1 + length]
                 offset_ch1 += length
 
             request = DacDataRequest(True, current_sequence_ch0, True, current_sequence_ch1)
             self._send_data_request(request)
 
         # Wait for all requests to complete
-        self._wait_for_all_responses(0.1)
+        self._wait_for_all_responses(timeout=0.1)
+        return DacDataStatusCode.SUCCESS
 
     def _send_data_request(self, request: DacDataRequest, timeout: float = 0.1) -> int:
         start_time = time.monotonic()
@@ -422,6 +429,8 @@ class DigitalToAnalog:
             self.expander._read_all()
             if time.monotonic() - start_time > timeout:
                 raise TimeoutError("Timeout waiting for request acceptance!")
+        else:
+            self.expander._read_all()
 
         self.sequence_number += 1
         self.request_id_counter += 1
@@ -434,6 +443,18 @@ class DigitalToAnalog:
         self.queue_space -= 1
         self.buffer_space_ch0 -= len(request.sequence_ch0)
         self.buffer_space_ch1 -= len(request.sequence_ch1)
+
+        print(
+            "Sending request (rid: %d, ch0_samples: %d, ch1_samples: %d, new space (queue: %d, ch0: %d, ch1: %d))"
+            % (
+                request.request_id,
+                len(request.sequence_ch0),
+                len(request.sequence_ch1),
+                self.queue_space,
+                self.buffer_space_ch0,
+                self.buffer_space_ch1,
+            )
+        )
 
         msg = dac_pb2.DacMsg()
         msg.sequence_number = self.sequence_number
@@ -472,12 +493,12 @@ class DigitalToAnalog:
             del container[request_id]
         return request
 
-    def _wait_for_all_responses(self, timeout) -> float:
+    def _wait_for_all_responses(self, timeout: float) -> float:
         start_time = time.monotonic()
         while self.data_requests:
             self.expander._read_all()
             complete_rids = []
-            for rid, request in self.data_requests:
+            for rid, request in self.data_requests.items():
                 status_code = request.status_code
                 if status_code == DacDataStatusCode.PENDING:
                     continue
@@ -491,6 +512,8 @@ class DigitalToAnalog:
 
             if time.monotonic() - start_time > timeout:
                 raise TimeoutError("Timeout waiting for all responses!")
+        else:
+            self.expander._read_all()
 
         passed_time = time.monotonic() - start_time
         return passed_time
@@ -501,6 +524,8 @@ class DigitalToAnalog:
             self._handle_config_status(msg)
         elif inner_msg == "data_status":
             self._handle_data_status(msg)
+        elif inner_msg == "notification":
+            self._handle_notification(msg)
         else:
             raise ValueError("Invalid DAC message type!")
 
@@ -515,12 +540,27 @@ class DigitalToAnalog:
             self.queue_space = msg.data_status.queue_space
             self.buffer_space_ch0 = msg.data_status.buffer_space_ch0
             self.buffer_space_ch1 = msg.data_status.buffer_space_ch1
-
+            print(
+                f"Updated space (queue: {self.queue_space}, ch0: {self.buffer_space_ch0}, ch1: {self.buffer_space_ch1})"
+            )
         request_id = msg.data_status.request_id
         if request_id not in self.data_requests:
             raise ValueError("Unknown data request status (id: %d) received!" % request_id)
 
         self.data_requests[request_id].status_code = DacDataStatusCode(msg.data_status.status_code)
+
+    def _handle_notification(self, msg: dac_pb2.DacMsg):
+        if msg.sequence_number >= self.sequence_number:
+            self.queue_space = msg.notification.queue_space
+            self.buffer_space_ch0 = msg.notification.buffer_space_ch0
+            self.buffer_space_ch1 = msg.notification.buffer_space_ch1
+            print(
+                f"Notification - updated space (queue: {self.queue_space}, ch0: {self.buffer_space_ch0}, ch1: {self.buffer_space_ch1})"
+            )
+        if msg.notification.buffer_underrun_ch0:
+            print("Warning: Buffer underrun on channel 0!")
+        if msg.notification.buffer_underrun_ch1:
+            print("Warning: Buffer underrun on channel 1!")
 
 
 def _receive_dac_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
-""" Testing Memory class
-"""
+"""Testing Memory class"""
 
 from interface_expander.InterfaceExpander import InterfaceExpander
 from interface_expander.I2cInterface import I2cInterface, I2cConfig, ClockFreq, AddressWidth, I2cId, I2C_MAX_WRITE_SIZE
@@ -29,35 +28,45 @@ class TestMemory:
     def test_slave_address_packing(self):
         eeprom_slave_addr = 0x50
         address_width = MemoryAddressWidth.TWO_BYTES
-        mem = Memory(interface=None, slave_address=eeprom_slave_addr, memory_type=MemoryType.EEPROM,
-                     address_width=address_width, page_count=1, page_size=pow(2, 17))
+        mem = Memory(
+            interface=None,
+            slave_address=eeprom_slave_addr,
+            memory_type=MemoryType.EEPROM,
+            address_width=address_width,
+            page_count=1,
+            page_size=pow(2, 17),
+        )
 
         address = pow(2, address_width.value * 8) - 1
-        mem._pack_slave_address(address) # Should not change the slave address
+        mem._pack_slave_address(address)  # Should not change the slave address
         assert mem.slave_address == eeprom_slave_addr
 
-        # If the memory size is larger than 2^16, the additional address bits will 
+        # If the memory size is larger than 2^16, the additional address bits will
         # be packed into the slave address byte.
         address = pow(2, address_width.value * 8)
         mem._pack_slave_address(address)
         assert mem.slave_address == 0b0101_0001  # 0x51 with additional address bit set
 
         address = pow(2, address_width.value * 8) - 1
-        mem._pack_slave_address(address) # Should not change the slave address
+        mem._pack_slave_address(address)  # Should not change the slave address
         assert mem.slave_address == eeprom_slave_addr
 
     def test_memory_write_read_fram(self):
         expander = InterfaceExpander()
         expander.connect()
 
-        cfg0 = I2cConfig(clock_freq=TestMemory.I2C_CLOCK_FREQ,
-                        slave_addr=0x01,
-                        slave_addr_width=AddressWidth.Bits7)
+        cfg0 = I2cConfig(clock_freq=TestMemory.I2C_CLOCK_FREQ, slave_addr=0x01, slave_addr_width=AddressWidth.Bits7)
         i2c0 = I2cInterface(i2c_id=I2cId.I2C0, config=cfg0)
 
-        mem = Memory(interface=i2c0, slave_address=TestMemory.FRAM_SLAVE_ADDR, memory_type=MemoryType.FRAM,
-                    address_width=MemoryAddressWidth.TWO_BYTES, page_count=1, page_size=TestMemory.FRAM_SIZE)
-        
+        mem = Memory(
+            interface=i2c0,
+            slave_address=TestMemory.FRAM_SLAVE_ADDR,
+            memory_type=MemoryType.FRAM,
+            address_width=MemoryAddressWidth.TWO_BYTES,
+            page_count=1,
+            page_size=TestMemory.FRAM_SIZE,
+        )
+
         for i in range(TestMemory.WRITE_READ_COUNT):
             data = generate_ascii_data(TestMemory.DATA_SIZE_MIN, TestMemory.DATA_SIZE_MAX)
             address = random.randint(0, TestMemory.FRAM_SIZE - len(data))
@@ -71,13 +80,17 @@ class TestMemory:
         expander = InterfaceExpander()
         expander.connect()
 
-        cfg0 = I2cConfig(clock_freq=TestMemory.I2C_CLOCK_FREQ,
-                         slave_addr=0x01,
-                         slave_addr_width=AddressWidth.Bits7)
+        cfg0 = I2cConfig(clock_freq=TestMemory.I2C_CLOCK_FREQ, slave_addr=0x01, slave_addr_width=AddressWidth.Bits7)
         i2c0 = I2cInterface(i2c_id=I2cId.I2C0, config=cfg0)
 
-        mem = Memory(interface=i2c0, slave_address=TestMemory.FRAM_SLAVE_ADDR, memory_type=MemoryType.FRAM,
-                     address_width=MemoryAddressWidth.TWO_BYTES, page_count=1, page_size=TestMemory.FRAM_SIZE)
+        mem = Memory(
+            interface=i2c0,
+            slave_address=TestMemory.FRAM_SLAVE_ADDR,
+            memory_type=MemoryType.FRAM,
+            address_width=MemoryAddressWidth.TWO_BYTES,
+            page_count=1,
+            page_size=TestMemory.FRAM_SIZE,
+        )
 
         # Generate random bin file for testing
         random_data = generate_ascii_data(TestMemory.FRAM_SIZE, TestMemory.FRAM_SIZE)
@@ -100,19 +113,23 @@ class TestMemory:
         expander = InterfaceExpander()
         expander.connect()
 
-        cfg0 = I2cConfig(clock_freq=TestMemory.I2C_CLOCK_FREQ,
-                         slave_addr=0x01,
-                         slave_addr_width=AddressWidth.Bits7)
+        cfg0 = I2cConfig(clock_freq=TestMemory.I2C_CLOCK_FREQ, slave_addr=0x01, slave_addr_width=AddressWidth.Bits7)
         i2c0 = I2cInterface(i2c_id=I2cId.I2C0, config=cfg0)
 
-        mem = Memory(interface=i2c0, slave_address=TestMemory.FRAM_SLAVE_ADDR, memory_type=MemoryType.FRAM,
-                     address_width=MemoryAddressWidth.TWO_BYTES, page_count=1, page_size=TestMemory.FRAM_SIZE)
+        mem = Memory(
+            interface=i2c0,
+            slave_address=TestMemory.FRAM_SLAVE_ADDR,
+            memory_type=MemoryType.FRAM,
+            address_width=MemoryAddressWidth.TWO_BYTES,
+            page_count=1,
+            page_size=TestMemory.FRAM_SIZE,
+        )
 
         # Generate random hex file for testing
         random_data = generate_ascii_data(TestMemory.FRAM_SIZE, TestMemory.FRAM_SIZE)
         ih = IntelHex()
         ih.puts(0, random_data)
-        ih.write_hex_file('littlefs_image.hex')
+        ih.write_hex_file("littlefs_image.hex")
 
         mem.upload_hex_file(r"littlefs_image.hex")  # file -> mem
         os.remove(r"littlefs_image.hex")
@@ -131,13 +148,17 @@ class TestMemory:
         expander = InterfaceExpander()
         expander.connect()
 
-        cfg0 = I2cConfig(clock_freq=TestMemory.I2C_CLOCK_FREQ,
-                        slave_addr=0x01,
-                        slave_addr_width=AddressWidth.Bits7)
+        cfg0 = I2cConfig(clock_freq=TestMemory.I2C_CLOCK_FREQ, slave_addr=0x01, slave_addr_width=AddressWidth.Bits7)
         i2c0 = I2cInterface(i2c_id=I2cId.I2C0, config=cfg0)
 
-        mem = Memory(interface=i2c0, slave_address=TestMemory.EEPROM_SLAVE_ADDR, memory_type=MemoryType.EEPROM,
-                    address_width=MemoryAddressWidth.TWO_BYTES, page_count=TestMemory.EEPROM_PAGE_COUNT, page_size=TestMemory.EEPROM_PAGE_SIZE)
+        mem = Memory(
+            interface=i2c0,
+            slave_address=TestMemory.EEPROM_SLAVE_ADDR,
+            memory_type=MemoryType.EEPROM,
+            address_width=MemoryAddressWidth.TWO_BYTES,
+            page_count=TestMemory.EEPROM_PAGE_COUNT,
+            page_size=TestMemory.EEPROM_PAGE_SIZE,
+        )
 
         for i in range(TestMemory.WRITE_READ_COUNT):
             data = generate_ascii_data(TestMemory.DATA_SIZE_MIN, TestMemory.DATA_SIZE_MAX)
@@ -152,13 +173,17 @@ class TestMemory:
         expander = InterfaceExpander()
         expander.connect()
 
-        cfg0 = I2cConfig(clock_freq=TestMemory.I2C_CLOCK_FREQ,
-                        slave_addr=0x01,
-                        slave_addr_width=AddressWidth.Bits7)
+        cfg0 = I2cConfig(clock_freq=TestMemory.I2C_CLOCK_FREQ, slave_addr=0x01, slave_addr_width=AddressWidth.Bits7)
         i2c0 = I2cInterface(i2c_id=I2cId.I2C0, config=cfg0)
 
-        mem = Memory(interface=i2c0, slave_address=TestMemory.EEPROM_SLAVE_ADDR, memory_type=MemoryType.EEPROM,
-                    address_width=MemoryAddressWidth.TWO_BYTES, page_count=TestMemory.EEPROM_PAGE_COUNT, page_size=TestMemory.EEPROM_PAGE_SIZE)
+        mem = Memory(
+            interface=i2c0,
+            slave_address=TestMemory.EEPROM_SLAVE_ADDR,
+            memory_type=MemoryType.EEPROM,
+            address_width=MemoryAddressWidth.TWO_BYTES,
+            page_count=TestMemory.EEPROM_PAGE_COUNT,
+            page_size=TestMemory.EEPROM_PAGE_SIZE,
+        )
 
         # Generate random bin file for testing
         random_data = generate_ascii_data(TestMemory.EEPROM_SIZE, TestMemory.EEPROM_SIZE)
@@ -181,19 +206,23 @@ class TestMemory:
         expander = InterfaceExpander()
         expander.connect()
 
-        cfg0 = I2cConfig(clock_freq=TestMemory.I2C_CLOCK_FREQ,
-                        slave_addr=0x01,
-                        slave_addr_width=AddressWidth.Bits7)
+        cfg0 = I2cConfig(clock_freq=TestMemory.I2C_CLOCK_FREQ, slave_addr=0x01, slave_addr_width=AddressWidth.Bits7)
         i2c0 = I2cInterface(i2c_id=I2cId.I2C0, config=cfg0)
 
-        mem = Memory(interface=i2c0, slave_address=TestMemory.EEPROM_SLAVE_ADDR, memory_type=MemoryType.EEPROM,
-                    address_width=MemoryAddressWidth.TWO_BYTES, page_count=TestMemory.EEPROM_PAGE_COUNT, page_size=TestMemory.EEPROM_PAGE_SIZE)
+        mem = Memory(
+            interface=i2c0,
+            slave_address=TestMemory.EEPROM_SLAVE_ADDR,
+            memory_type=MemoryType.EEPROM,
+            address_width=MemoryAddressWidth.TWO_BYTES,
+            page_count=TestMemory.EEPROM_PAGE_COUNT,
+            page_size=TestMemory.EEPROM_PAGE_SIZE,
+        )
 
         # Generate random hex file for testing
         random_data = generate_ascii_data(TestMemory.EEPROM_SIZE, TestMemory.EEPROM_SIZE)
         ih = IntelHex()
         ih.puts(0, random_data)
-        ih.write_hex_file('littlefs_image.hex')
+        ih.write_hex_file("littlefs_image.hex")
 
         mem.upload_hex_file(r"littlefs_image.hex")  # file -> mem
         os.remove(r"littlefs_image.hex")

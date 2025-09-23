@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
-""" Testing USB communication with tinyframe in a loop
-"""
+"""Testing USB communication with tinyframe in a loop"""
 
 from interface_expander.InterfaceExpander import InterfaceExpander
 from interface_expander.EchoCom import EchoCom
@@ -25,7 +24,7 @@ class TestUsbCom:
         while counter > 0:
             tx_data = generate_ascii_data(TestUsbCom.DATA_SIZE_MIN, TestUsbCom.DATA_SIZE_MAX)
             usb_com.send(tx_data)
-            print(f"Send: {tx_data}")
+            # print(f"Send: {tx_data}")
             echo = usb_com.read_echo(timeout=0.02)
             assert echo == tx_data
             counter -= 1
@@ -38,7 +37,7 @@ class TestUsbCom:
         expander.connect()
 
         usb_com = EchoCom()
-        
+
         # Generate a list of data to send
         # This is done to avoid generating new data in each loop iteration
         data = []

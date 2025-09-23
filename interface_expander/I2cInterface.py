@@ -148,8 +148,6 @@ class I2cInterface:
         if isinstance(request, I2cMasterRequest):
             if request.slave_addr == self.config.slave_addr:
                 raise ValueError("Slave address in request collides with own slave address!")
-            if len(request.write_data) == 0 and request.read_size == 0:
-                raise ValueError("Write and read data cannot both be empty!")
             if len(request.write_data) > I2C_MAX_WRITE_SIZE or request.read_size > I2C_MAX_READ_SIZE:
                 raise ValueError("Write/read data size exceeds maximum allowed (%d)" % I2C_MAX_WRITE_SIZE)
 
@@ -165,8 +163,10 @@ class I2cInterface:
         self._check_request_sanity(request)
         accept = False
 
-        if isinstance(request, I2cMasterRequest) and self.master_queue_space > 0:
-            if self.master_buffer_space1 >= (len(request.write_data) + request.read_size):
+        if isinstance(request, I2cMasterRequest):
+            if self.master_queue_space == 0:
+                pass
+            elif self.master_buffer_space1 >= (len(request.write_data) + request.read_size):
                 accept = True
             elif (
                 self.master_buffer_space1 >= len(request.write_data) and self.master_buffer_space2 >= request.read_size
@@ -179,8 +179,9 @@ class I2cInterface:
             elif self.master_buffer_space2 >= (len(request.write_data) + request.read_size):
                 accept = True
 
-        elif isinstance(request, I2cSlaveRequest) and self.slave_queue_space > 0:
-            accept = True
+        elif isinstance(request, I2cSlaveRequest):
+            if self.slave_queue_space > 0:
+                accept = True
         elif isinstance(request, I2cConfig):
             accept = True
         else:
@@ -206,6 +207,7 @@ class I2cInterface:
     def _update_free_space(self, request) -> None:
         if isinstance(request, I2cMasterRequest):
             self.master_queue_space -= 1
+            assert self.master_queue_space >= 0
 
             bigger_section = max(len(request.write_data), request.read_size)
             smaller_section = min(len(request.write_data), request.read_size)
@@ -229,6 +231,7 @@ class I2cInterface:
 
         elif isinstance(request, I2cSlaveRequest):
             self.slave_queue_space -= 1
+            assert self.slave_queue_space >= 0
 
     def get_pending_master_request_ids(self) -> list[int]:
         return [
@@ -421,6 +424,23 @@ class I2cInterface:
         msg_bytes = msg.SerializeToString()
         tf.TF_INSTANCE.send(tf.TfMsgType.TYPE_I2C.value, msg_bytes, 0)
         return request.request_id
+
+    def slave_scan(self, addr_range=range(1, 128), address_width=AddressWidth.Bits7) -> list[int]:
+        found_devices = []
+        for addr in addr_range:
+            if addr == self.config.slave_addr:
+                continue
+            try:
+                request = I2cMasterRequest(slave_addr=addr, write_data=bytes(), read_size=0)
+                rid = self.send_request(request=request, timeout=0.1)
+                req = self.wait_for_response(request_id=rid, timeout=0.1, pop_request=True)
+                if req.status_code == I2cStatusCode.SUCCESS:
+                    found_devices.append(addr)
+                elif req.status_code != I2cStatusCode.SLAVE_NO_ACK:
+                    raise RuntimeError("Unexpected status code (%s) from slave: 0x%02X" % (req.status_code.name, addr))
+            except TimeoutError:
+                pass
+        return found_devices
 
     def wait_for_response(
         self, request_id: int, timeout: float, pop_request: bool = False

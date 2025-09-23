@@ -136,7 +136,7 @@ class DigitalToAnalog:
             update_ch1_config = False
 
         if not update_ch0_config and not update_ch1_config:
-            print("No configuration changes detected, skipping update.")
+            # print("No configuration changes detected, skipping update.")
             return DacConfigStatusCode.SUCCESS
 
         self.data_requests = {}
@@ -221,11 +221,13 @@ class DigitalToAnalog:
         elif isinstance(request, DacConfig):
             accept = True
 
+        """
         if accept:
             print(
                 "Accept request (queue_space: %d, buffer_space_ch0: %d, buffer_space_ch1: %d)"
                 % (self.queue_space, self.buffer_space_ch0, self.buffer_space_ch1)
             )
+        """
 
         return accept
 
@@ -337,18 +339,17 @@ class DigitalToAnalog:
         for i in range(max_count):
             offset = i * DAC_MAX_DATA_SAMPLES
             current_sequence_ch0 = []
-            current_sequence_ch1 = []
-            run_ch0 = False
-            run_ch1 = False
-
             if offset < len_ch0:
                 length = min(DAC_MAX_DATA_SAMPLES, len(sequence_ch0) - offset)
                 current_sequence_ch0 = sequence_ch0[offset : offset + length]
 
+            current_sequence_ch1 = []
             if offset < len_ch1:
                 length = min(DAC_MAX_DATA_SAMPLES, len(sequence_ch1) - offset)
                 current_sequence_ch1 = sequence_ch1[offset : offset + length]
 
+            run_ch0 = False
+            run_ch1 = False
             if i == (max_count - 1):  # Last request should run the sequence(s)
                 run_ch0 = sequence_ch0 is not None
                 run_ch1 = sequence_ch1 is not None
@@ -400,8 +401,9 @@ class DigitalToAnalog:
                 or self.buffer_space_ch1 < DAC_MAX_DATA_SAMPLES
                 or self.queue_space == 0
             ):
+                # self.expander._read_all()
                 self._wait_for_all_responses(timeout=0.1)
-                if time.monotonic() - start_time > timeout + 0.1:
+                if time.monotonic() - start_time > timeout + 0.42:
                     raise TimeoutError("Timeout waiting for buffer space!")
 
             current_sequence_ch0 = []
@@ -420,7 +422,7 @@ class DigitalToAnalog:
             self._send_data_request(request)
 
         # Wait for all requests to complete
-        self._wait_for_all_responses(timeout=0.1)
+        self._wait_for_all_responses(timeout=0.42)
         return DacDataStatusCode.SUCCESS
 
     def _send_data_request(self, request: DacDataRequest, timeout: float = 0.1) -> int:
@@ -444,6 +446,7 @@ class DigitalToAnalog:
         self.buffer_space_ch0 -= len(request.sequence_ch0)
         self.buffer_space_ch1 -= len(request.sequence_ch1)
 
+        """
         print(
             "Sending request (rid: %d, ch0_samples: %d, ch1_samples: %d, new space (queue: %d, ch0: %d, ch1: %d))"
             % (
@@ -455,6 +458,7 @@ class DigitalToAnalog:
                 self.buffer_space_ch1,
             )
         )
+        """
 
         msg = dac_pb2.DacMsg()
         msg.sequence_number = self.sequence_number
@@ -540,26 +544,37 @@ class DigitalToAnalog:
             self.queue_space = msg.data_status.queue_space
             self.buffer_space_ch0 = msg.data_status.buffer_space_ch0
             self.buffer_space_ch1 = msg.data_status.buffer_space_ch1
+            """
             print(
                 f"Updated space (queue: {self.queue_space}, ch0: {self.buffer_space_ch0}, ch1: {self.buffer_space_ch1})"
             )
+            """
         request_id = msg.data_status.request_id
         if request_id not in self.data_requests:
             raise ValueError("Unknown data request status (id: %d) received!" % request_id)
 
-        self.data_requests[request_id].status_code = DacDataStatusCode(msg.data_status.status_code)
+        status = DacDataStatusCode(msg.data_status.status_code)
+        self.data_requests[request_id].status_code = status
+
+        if status != DacDataStatusCode.SUCCESS:
+            raise RuntimeError(f"Data request {request_id} failed with status: {status}")
 
     def _handle_notification(self, msg: dac_pb2.DacMsg):
         if msg.sequence_number >= self.sequence_number:
             self.queue_space = msg.notification.queue_space
             self.buffer_space_ch0 = msg.notification.buffer_space_ch0
             self.buffer_space_ch1 = msg.notification.buffer_space_ch1
+            """
             print(
                 f"Notification - updated space (queue: {self.queue_space}, ch0: {self.buffer_space_ch0}, ch1: {self.buffer_space_ch1})"
             )
-        if msg.notification.buffer_underrun_ch0:
+            """
+
+        if msg.notification.buffer_underrun_ch0 and msg.notification.buffer_underrun_ch1:
+            print("Warning: Buffer underrun on both channels!")
+        elif msg.notification.buffer_underrun_ch0:
             print("Warning: Buffer underrun on channel 0!")
-        if msg.notification.buffer_underrun_ch1:
+        elif msg.notification.buffer_underrun_ch1:
             print("Warning: Buffer underrun on channel 1!")
 
 

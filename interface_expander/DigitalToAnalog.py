@@ -101,6 +101,9 @@ class DigitalToAnalog:
         self.buffer_space_ch0 = DAC_MAX_SAMPLE_BUFFER_SPACE
         self.buffer_space_ch1 = DAC_MAX_SAMPLE_BUFFER_SPACE
 
+        self.buffer_underrun_ch0 = False
+        self.buffer_underrun_ch1 = False
+
         global DAC_INSTANCE
         DAC_INSTANCE = self
 
@@ -115,12 +118,15 @@ class DigitalToAnalog:
         if self._apply_config(config) != DacConfigStatusCode.SUCCESS:
             raise RuntimeError("Failed to apply DAC configuration")
 
-    def _apply_config(self, config: DacConfig, timeout: float = 1.0) -> DacConfigStatusCode:
+    def _apply_config(
+        self, config: DacConfig, force_config_ch0: bool = False, force_config_ch1: bool = False, timeout: float = 1.0
+    ) -> DacConfigStatusCode:
         update_ch0_config = True
         update_ch1_config = True
 
         if (
-            self.config
+            not force_config_ch0
+            and self.config
             and self.config.mode_ch0 == config.mode_ch0
             and self.config.sampling_rate_ch0 == config.sampling_rate_ch0
             and self.config.sample_count_ch0 == config.sample_count_ch0
@@ -128,7 +134,8 @@ class DigitalToAnalog:
             update_ch0_config = False
 
         if (
-            self.config
+            not force_config_ch1
+            and self.config
             and self.config.mode_ch1 == config.mode_ch1
             and self.config.sampling_rate_ch1 == config.sampling_rate_ch1
             and self.config.sample_count_ch1 == config.sample_count_ch1
@@ -136,7 +143,6 @@ class DigitalToAnalog:
             update_ch1_config = False
 
         if not update_ch0_config and not update_ch1_config:
-            # print("No configuration changes detected, skipping update.")
             return DacConfigStatusCode.SUCCESS
 
         self.data_requests = {}
@@ -144,8 +150,10 @@ class DigitalToAnalog:
             self.queue_space = DAC_MAX_QUEUE_SPACE
         if update_ch0_config:
             self.buffer_space_ch0 = DAC_MAX_SAMPLE_BUFFER_SPACE
+            self.buffer_underrun_ch0 = False
         if update_ch1_config:
             self.buffer_space_ch1 = DAC_MAX_SAMPLE_BUFFER_SPACE
+            self.buffer_underrun_ch1 = False
 
         self.sequence_number += 1
         self.request_id_counter += 1
@@ -323,13 +331,17 @@ class DigitalToAnalog:
             config.sampling_rate_ch1 = sampling_rate_ch1
             config.sample_count_ch1 = len(sequence_ch1)
 
-        if self._apply_config(config) != DacConfigStatusCode.SUCCESS:
+        force_config_ch0 = sequence_ch0 is not None
+        force_config_ch1 = sequence_ch1 is not None
+        if self._apply_config(config, force_config_ch0, force_config_ch1) != DacConfigStatusCode.SUCCESS:
             raise RuntimeError("Failed to apply DAC configuration!")
 
-        assert self.queue_space == DAC_MAX_QUEUE_SPACE
-        assert self.buffer_space_ch0 == DAC_MAX_SAMPLE_BUFFER_SPACE
-        assert self.buffer_space_ch1 == DAC_MAX_SAMPLE_BUFFER_SPACE
         assert self.data_requests == {}
+        assert self.queue_space == DAC_MAX_QUEUE_SPACE
+        if sequence_ch0 is not None:
+            assert self.buffer_space_ch0 == DAC_MAX_SAMPLE_BUFFER_SPACE
+        if sequence_ch1 is not None:
+            assert self.buffer_space_ch1 == DAC_MAX_SAMPLE_BUFFER_SPACE
 
         len_ch0 = len(sequence_ch0) if sequence_ch0 else 0
         len_ch1 = len(sequence_ch1) if sequence_ch1 else 0
@@ -359,6 +371,12 @@ class DigitalToAnalog:
 
         # Wait for all requests to complete
         self._wait_for_all_responses(timeout=0.1)
+        assert self.data_requests == {}
+        assert self.queue_space == DAC_MAX_QUEUE_SPACE
+        if sequence_ch0 is not None:
+            assert self.buffer_space_ch0 == DAC_MAX_SAMPLE_BUFFER_SPACE - len_ch0
+        if sequence_ch1 is not None:
+            assert self.buffer_space_ch1 == DAC_MAX_SAMPLE_BUFFER_SPACE - len_ch1
         return DacDataStatusCode.SUCCESS
 
     def stream_sequence(
@@ -411,12 +429,14 @@ class DigitalToAnalog:
                 length = min(DAC_MAX_DATA_SAMPLES, len_ch0 - offset_ch0, self.buffer_space_ch0)
                 current_sequence_ch0 = sequence_ch0[offset_ch0 : offset_ch0 + length]
                 offset_ch0 += length
+                # self.buffer_underrun_ch0 = False
 
             current_sequence_ch1 = []
             if offset_ch1 < len_ch1:
                 length = min(DAC_MAX_DATA_SAMPLES, len_ch1 - offset_ch1, self.buffer_space_ch1)
                 current_sequence_ch1 = sequence_ch1[offset_ch1 : offset_ch1 + length]
                 offset_ch1 += length
+                # self.buffer_underrun_ch0 = True
 
             request = DacDataRequest(True, current_sequence_ch0, True, current_sequence_ch1)
             self._send_data_request(request)
@@ -549,6 +569,7 @@ class DigitalToAnalog:
                 f"Updated space (queue: {self.queue_space}, ch0: {self.buffer_space_ch0}, ch1: {self.buffer_space_ch1})"
             )
             """
+
         request_id = msg.data_status.request_id
         if request_id not in self.data_requests:
             raise ValueError("Unknown data request status (id: %d) received!" % request_id)
@@ -571,11 +592,15 @@ class DigitalToAnalog:
             """
 
         if msg.notification.buffer_underrun_ch0 and msg.notification.buffer_underrun_ch1:
-            print("Warning: Buffer underrun on both channels!")
+            self.buffer_underrun_ch0 = True
+            self.buffer_underrun_ch1 = True
+            # print("Warning: Buffer underrun on both channels!")
         elif msg.notification.buffer_underrun_ch0:
-            print("Warning: Buffer underrun on channel 0!")
+            self.buffer_underrun_ch0 = True
+            # print("Warning: Buffer underrun on channel 0!")
         elif msg.notification.buffer_underrun_ch1:
-            print("Warning: Buffer underrun on channel 1!")
+            self.buffer_underrun_ch1 = True
+            # print("Warning: Buffer underrun on channel 1!")
 
 
 def _receive_dac_msg_cb(_, tf_msg: tf.TF.TF_Msg) -> None:

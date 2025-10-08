@@ -1,7 +1,7 @@
 from __future__ import annotations
 from interface_expander.proto.proto_py import dac_pb2
 from enum import Enum
-from typing import Callable
+from typing import Callable, Iterable
 from copy import copy
 import interface_expander.tiny_frame as tf
 import interface_expander.InterfaceExpander as intexp
@@ -17,14 +17,11 @@ DAC_MIN_SAMPLING_RATE = 1  # Minimum sampling rate in Hz
 DAC_MAX_SAMPLING_RATE = 500000  # Maximum sampling rate in Hz (500 kHz)
 DAC_VREF = 2.5  # Reference voltage for DAC in Volts
 DAC_STEP = DAC_VREF / DAC_MAX_SAMPLE_VALUE  # Step size for DAC output
-DAC_GAIN_CH0 = 9.96  # Gain for DAC output
-DAC_GAIN_CH1 = 9.96
+DAC_GAIN_CH0 = 10.0  # Gain for DAC output
+DAC_GAIN_CH1 = 10.0
 DAC_OPAMP_OFFSET = DAC_VREF / 2.0  # Op-amp offset for DAC output
-DAC_CORRECTION_CH0 = int(0.008 * DAC_MAX_SAMPLE_VALUE / DAC_GAIN_CH0 / DAC_VREF)  # Channel 0 offset correction
-DAC_CORRECTION_CH1 = int(0.016 * DAC_MAX_SAMPLE_VALUE / DAC_GAIN_CH1 / DAC_VREF)  # Channel 1 offset correction
-DAC_DELTA_VOLTAGE = 22.0  # +/-11V
-DAC_DELTA_CORRECTION = int(0.04 * DAC_MAX_SAMPLE_VALUE / DAC_GAIN_CH0 / DAC_VREF)
-
+DAC_CORRECTION_CH0 = int(0.0023 * DAC_MAX_SAMPLE_VALUE / DAC_GAIN_CH0 / DAC_VREF)  # Channel 0 offset correction
+DAC_CORRECTION_CH1 = int(0.0042 * DAC_MAX_SAMPLE_VALUE / DAC_GAIN_CH1 / DAC_VREF)  # Channel 1 offset correction
 
 DAC_INSTANCE: DigitalToAnalog | None = None
 
@@ -76,7 +73,7 @@ class DacConfig:
 
 
 class DacDataRequest:
-    def __init__(self, run_ch0: bool, sequence_ch0: iter, run_ch1: bool, sequence_ch1: iter):
+    def __init__(self, run_ch0: bool, sequence_ch0: list, run_ch1: bool, sequence_ch1: list):
         self.status_code = DacDataStatusCode.NOT_INIT
         self.request_id = None
 
@@ -192,6 +189,28 @@ class DigitalToAnalog:
         self._wait_for_response(config.request_id, timeout)
         return config.status_code
 
+    def _can_accept_request(self, request: DacDataRequest | DacConfig) -> bool:
+        accept = False
+
+        if isinstance(request, DacDataRequest):
+            if self.queue_space > 0 and (
+                self.buffer_space_ch0 >= len(request.sequence_ch0)
+                and self.buffer_space_ch1 >= len(request.sequence_ch1)
+            ):
+                accept = True
+        elif isinstance(request, DacConfig):
+            accept = True
+
+        """
+        if accept:
+            print(
+                "Accept request (queue_space: %d, buffer_space_ch0: %d, buffer_space_ch1: %d)"
+                % (self.queue_space, self.buffer_space_ch0, self.buffer_space_ch1)
+            )
+        """
+
+        return accept
+
     @staticmethod
     def _verify_parameters(mode: DacMode, sequence: list, sampling_rate: int | None) -> None:
         if mode not in DacMode:
@@ -217,29 +236,8 @@ class DigitalToAnalog:
                     "Sampling rate out of range (%d to %d)" % (DAC_MIN_SAMPLING_RATE, DAC_MAX_SAMPLING_RATE)
                 )
 
-    def _can_accept_request(self, request: DacDataRequest | DacConfig) -> bool:
-        accept = False
-
-        if isinstance(request, DacDataRequest):
-            if self.queue_space > 0 and (
-                self.buffer_space_ch0 >= len(request.sequence_ch0)
-                and self.buffer_space_ch1 >= len(request.sequence_ch1)
-            ):
-                accept = True
-        elif isinstance(request, DacConfig):
-            accept = True
-
-        """
-        if accept:
-            print(
-                "Accept request (queue_space: %d, buffer_space_ch0: %d, buffer_space_ch1: %d)"
-                % (self.queue_space, self.buffer_space_ch0, self.buffer_space_ch1)
-            )
-        """
-
-        return accept
-
-    def output_voltage(self, voltage_ch0: float | None, voltage_ch1: float | None) -> DacDataStatusCode:
+    @staticmethod
+    def _voltage_to_value(voltage_ch0: float | None, voltage_ch1: float | None) -> tuple[int | None, int | None]:
         # volt = ((value * DAC_STEP) - DAC_OPAMP_OFFSET) * DAC_GAIN
         # volt = ((value * DAC_VREF / DAC_MAX_SAMPLE_VALUE) - (DAC_VREF / 2)) * DAC_GAIN
         value_ch0 = None
@@ -250,33 +248,25 @@ class DigitalToAnalog:
             value_ch0 = int(
                 (voltage_ch0 / DAC_GAIN_CH0 + DAC_OPAMP_OFFSET) * DAC_MAX_SAMPLE_VALUE / DAC_VREF - DAC_CORRECTION_CH0
             )
+            if value_ch0 < DAC_MIN_SAMPLE_VALUE:
+                value_ch0 = DAC_MIN_SAMPLE_VALUE
+            if value_ch0 > DAC_MAX_SAMPLE_VALUE:
+                value_ch0 = DAC_MAX_SAMPLE_VALUE
+
         if voltage_ch1 is not None:
             value_ch1 = int(
                 (voltage_ch1 / DAC_GAIN_CH1 + DAC_OPAMP_OFFSET) * DAC_MAX_SAMPLE_VALUE / DAC_VREF - DAC_CORRECTION_CH1
             )
+            if value_ch1 < DAC_MIN_SAMPLE_VALUE:
+                value_ch1 = DAC_MIN_SAMPLE_VALUE
+            if value_ch1 > DAC_MAX_SAMPLE_VALUE:
+                value_ch1 = DAC_MAX_SAMPLE_VALUE
 
-        # Apply delta correction for +/-11V range
-        delta = abs(voltage_ch1 - voltage_ch0)
-        correction = int(delta / DAC_DELTA_VOLTAGE * DAC_DELTA_CORRECTION)
-        if voltage_ch0 * voltage_ch1 > 0:  # Same sign
-            if voltage_ch0 > voltage_ch1:
-                value_ch0 -= correction
-                value_ch1 += correction
-            else:
-                value_ch1 -= correction
-                value_ch0 += correction
-        else:  # Different signs
-            if voltage_ch0 > 0:
-                value_ch0 -= correction
-                value_ch1 += correction
-            else:
-                value_ch1 -= correction
-                value_ch0 += correction
+        return value_ch0, value_ch1
 
-        return self.output_value(value_ch0, value_ch1)
-
-    def output_value(self, value_ch0: int | None, value_ch1: int | None) -> DacDataStatusCode:
+    def set_voltage(self, ch0: float | None = None, ch1: float | None = None) -> DacDataStatusCode:
         config = copy(self.config)
+        value_ch0, value_ch1 = DigitalToAnalog._voltage_to_value(ch0, ch1)
 
         if value_ch0 is None and value_ch1 is None:
             raise ValueError("At least one channel value must be set!")
@@ -309,12 +299,14 @@ class DigitalToAnalog:
 
     def loop_sequence(
         self,
-        sequence_ch0: list[int] | None,
+        sequence_ch0: Iterable[float] | None,
         sampling_rate_ch0: int | None,
-        sequence_ch1: list[int] | None,
+        sequence_ch1: Iterable[float] | None,
         sampling_rate_ch1: int | None,
     ) -> DacDataStatusCode:
         config = copy(self.config)
+        sequence_ch0 = [DigitalToAnalog._voltage_to_value(v, None)[0] for v in sequence_ch0] if sequence_ch0 else None
+        sequence_ch1 = [DigitalToAnalog._voltage_to_value(None, v)[1] for v in sequence_ch1] if sequence_ch1 else None
 
         if sequence_ch0 is None and sequence_ch1 is None:
             raise ValueError("At least one channel sequence must be set!")
@@ -381,12 +373,14 @@ class DigitalToAnalog:
 
     def stream_sequence(
         self,
-        sequence_ch0: list[int] | None,
+        sequence_ch0: Iterable[float] | None,
         sampling_rate_ch0: int | None,
-        sequence_ch1: list[int] | None,
+        sequence_ch1: Iterable[float] | None,
         sampling_rate_ch1: int | None,
     ) -> DacDataStatusCode:
         config = copy(self.config)
+        sequence_ch0 = [DigitalToAnalog._voltage_to_value(v, None)[0] for v in sequence_ch0] if sequence_ch0 else None
+        sequence_ch1 = [DigitalToAnalog._voltage_to_value(None, v)[1] for v in sequence_ch1] if sequence_ch1 else None
 
         if sequence_ch0 is None and sequence_ch1 is None:
             raise ValueError("At least one channel sequence must be set!")

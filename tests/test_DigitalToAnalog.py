@@ -9,16 +9,18 @@ class TestDigitalToAnalog:
     REQUEST_COUNT = 100
     SAMPLING_RATE = 22000
 
-    def test_output_voltage(self):
+    def test_set_voltage(self):
         expander = InterfaceExpander()
         expander.reset()
         expander.connect()
 
         dac = DigitalToAnalog()
         for _ in range(TestDigitalToAnalog.REQUEST_COUNT):
-            dac.output_voltage(voltage_ch0=4.2, voltage_ch1=0.0)
-            dac.output_voltage(voltage_ch0=0.0, voltage_ch1=4.2)
-            dac.output_voltage(voltage_ch0=12, voltage_ch1=-12)
+            dac.set_voltage(ch0=4.2, ch1=0.0)
+            dac.set_voltage(ch0=0.0, ch1=4.2)
+            dac.set_voltage(ch0=12, ch1=-12)
+            dac.set_voltage(ch0=6.9)
+            dac.set_voltage(ch1=-6.9)
         expander.disconnect()
 
     def test_loop_sequence(self):
@@ -87,9 +89,9 @@ class TestDigitalToAnalog:
         jigsaw_sequence = [int(i / (sample_count - 1) * DAC_MAX_SAMPLE_VALUE) for i in range(sample_count)]
 
         for _ in range(TestDigitalToAnalog.REQUEST_COUNT):
-            dac.output_voltage(voltage_ch0=4.242, voltage_ch1=0.0)
-            dac.output_voltage(voltage_ch0=0.0, voltage_ch1=4.242)
-            dac.output_voltage(voltage_ch0=12.005, voltage_ch1=-12.005)
+            dac.set_voltage(ch0=4.242, ch1=0.0)
+            dac.set_voltage(ch0=0.0, ch1=4.242)
+            dac.set_voltage(ch0=12.005, ch1=-12.005)
 
             dac.loop_sequence(
                 sequence_ch0=sin_sequence,
@@ -98,9 +100,9 @@ class TestDigitalToAnalog:
                 sampling_rate_ch1=TestDigitalToAnalog.SAMPLING_RATE,
             )
 
-            dac.output_voltage(voltage_ch0=4.242, voltage_ch1=0.0)
-            dac.output_voltage(voltage_ch0=0.0, voltage_ch1=4.242)
-            dac.output_voltage(voltage_ch0=12.005, voltage_ch1=-12.005)
+            dac.set_voltage(ch0=4.242, ch1=0.0)
+            dac.set_voltage(ch0=0.0, ch1=4.242)
+            dac.set_voltage(ch0=12.005, ch1=-12.005)
 
             # time.sleep(0.1)
             for i in range(5):
@@ -112,9 +114,9 @@ class TestDigitalToAnalog:
                 )
             # time.sleep(0.05)
 
-            dac.output_voltage(voltage_ch0=4.242, voltage_ch1=0.0)
-            dac.output_voltage(voltage_ch0=0.0, voltage_ch1=4.242)
-            dac.output_voltage(voltage_ch0=12.005, voltage_ch1=-12.005)
+            dac.set_voltage(ch0=4.242, ch1=0.0)
+            dac.set_voltage(ch0=0.0, ch1=4.242)
+            dac.set_voltage(ch0=12.005, ch1=-12.005)
 
             dac.loop_sequence(
                 sequence_ch0=sin_sequence,

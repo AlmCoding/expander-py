@@ -6,8 +6,8 @@ import random
 
 
 class TestDigitalToAnalog:
-    REQUEST_COUNT = 100
-    SAMPLING_RATE = 22000
+    REQUEST_COUNT = 1000
+    SAMPLING_RATE = 20000
 
     def test_set_voltage(self):
         expander = InterfaceExpander()

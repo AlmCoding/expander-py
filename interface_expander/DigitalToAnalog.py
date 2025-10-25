@@ -20,8 +20,10 @@ DAC_STEP = DAC_VREF / DAC_MAX_SAMPLE_VALUE  # Step size for DAC output
 DAC_GAIN_CH0 = 10.0  # Gain for DAC output
 DAC_GAIN_CH1 = 10.0
 DAC_OPAMP_OFFSET = DAC_VREF / 2.0  # Op-amp offset for DAC output
-DAC_CORRECTION_CH0 = int(0.0023 * DAC_MAX_SAMPLE_VALUE / DAC_GAIN_CH0 / DAC_VREF)  # Channel 0 offset correction
-DAC_CORRECTION_CH1 = int(0.0042 * DAC_MAX_SAMPLE_VALUE / DAC_GAIN_CH1 / DAC_VREF)  # Channel 1 offset correction
+DAC_CORRECTION_CH0 = int(-0.0022 * DAC_MAX_SAMPLE_VALUE / DAC_GAIN_CH0 / DAC_VREF)  # Channel 0 offset correction
+DAC_CORRECTION_CH1 = int(0.0039 * DAC_MAX_SAMPLE_VALUE / DAC_GAIN_CH1 / DAC_VREF)  # Channel 1 offset correction
+IDAC_RESISTANCE = 500  # Resistance in Ohms for current output conversion
+IDAC_MAX_CURRENT = 24.0  # Maximum current in mA for IDAC
 
 DAC_INSTANCE: DigitalToAnalog | None = None
 
@@ -263,6 +265,25 @@ class DigitalToAnalog:
                 value_ch1 = DAC_MAX_SAMPLE_VALUE
 
         return value_ch0, value_ch1
+
+    @staticmethod
+    def current_to_voltage(current: float) -> float:
+        "Current in mA, voltage in V"
+        if not (-IDAC_MAX_CURRENT <= current <= IDAC_MAX_CURRENT):
+            raise ValueError("Current out of range (%.2f mA to %.2f mA)" % (-IDAC_MAX_CURRENT, IDAC_MAX_CURRENT))
+        voltage = (current / 1000.0) * IDAC_RESISTANCE
+        return voltage
+
+    def set_current(self, ch0: float | None = None, ch1: float | None = None) -> DacDataStatusCode:
+        voltage_ch0 = None
+        voltage_ch1 = None
+
+        if ch0 is not None:
+            voltage_ch0 = DigitalToAnalog.current_to_voltage(ch0)
+        if ch1 is not None:
+            voltage_ch1 = DigitalToAnalog.current_to_voltage(ch1)
+
+        return self.set_voltage(voltage_ch0, voltage_ch1)
 
     def set_voltage(self, ch0: float | None = None, ch1: float | None = None) -> DacDataStatusCode:
         config = copy(self.config)

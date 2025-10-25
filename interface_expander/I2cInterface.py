@@ -91,7 +91,7 @@ class I2cMasterRequest:
 
 class I2cSlaveRequest:
     def __init__(
-        self, write_addr: int, write_data: bytes, read_addr: int, read_size: int, callback_fn: Callable = None
+        self, write_addr: int, write_data: bytes, read_addr: int = 0, read_size: int = 0, callback_fn: Callable = None
     ):
         self.status_code = I2cStatusCode.NOT_INIT
         self.request_id = None
